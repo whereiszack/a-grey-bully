@@ -14,12 +14,11 @@
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
-        /* UI */
+        /* UI Components */
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.95); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; position: relative; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.95); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; }
         
         #save-btn { background: #ff3333; color: white; border: none; padding: 14px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; }
-        #save-ts { font-size: 11px; display: block; margin-top: 10px; font-weight: bold; color: #ffcc33; }
         .pulse { animation: pulseRed 1.2s infinite; }
         @keyframes pulseRed { 0% { background: #ff3333; } 50% { background: #880000; } 100% { background: #ff3333; } }
 
@@ -27,16 +26,15 @@
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         
-        /* Crosshair */
-        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 200px; height: 200px; pointer-events: none; }
-        #crosshair { width: 100%; height: 100%; border: 2px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.7); }
-        #crosshair::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: #00ff00; }
-        #crosshair::after { content: ''; position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: #00ff00; }
-        #center-dot { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: red; border-radius: 50%; transform: translate(-50%, -50%); }
+        /* Crosshair UI */
+        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 220px; height: 220px; pointer-events: none; }
+        #crosshair { width: 100%; height: 100%; border: 3px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.75); }
+        #crosshair::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: #00ff00; opacity: 0.7; }
+        #crosshair::after { content: ''; position: absolute; left: 50%; top: 0; width: 2px; height: 100%; background: #00ff00; opacity: 0.7; }
         
-        #cancel-x { position: absolute; top: 10px; left: 10px; background: #ff3333; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; pointer-events: auto; border: 2px solid white; }
+        #cancel-x { position: absolute; top: -50px; left: -50px; background: #ff3333; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; cursor: pointer; pointer-events: auto; border: 3px solid white; z-index: 100; box-shadow: 0 0 20px rgba(255,0,0,0.8); }
 
-        #celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; justify-content: center; align-items: center; text-align: center; }
+        #celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; justify-content: center; align-items: center; text-align: center; }
     </style>
 </head>
 <body>
@@ -45,43 +43,49 @@
 
 <div id="crosshair-container">
     <div id="cancel-x" onclick="togglePlacementMode()">✕</div>
-    <div id="crosshair" onclick="fireSnack()"><div id="center-dot"></div></div>
+    <div id="crosshair" onclick="fireSnack()">
+        <div style="position:absolute; top:50%; left:50%; width:8px; height:8px; background:red; border-radius:50%; transform:translate(-50%,-50%); box-shadow: 0 0 12px red;"></div>
+    </div>
 </div>
 
 <div id="celebration" onclick="this.style.display='none'">
-    <h1 style="color:#ffcc33;">SNACK PATROL COMPLETE!</h1>
-    <p>(Tap to continue)</p>
+    <div>
+        <h1 style="color:#ffcc33; font-size:42px; margin-bottom:10px;">SNACK PATROL<br>COMPLETE!</h1>
+        <p style="color:white; font-weight:bold;">TAP TO CLOSE</p>
+    </div>
 </div>
 
 <div class="ui-header">
     <button class="btn" style="pointer-events:auto;" onclick="togglePlacementMode()">➕ LOG SNACK</button>
     <div class="stats">
-        SNACKS: <span id="snack-count">0</span>
-        <button id="save-btn" class="pulse" onclick="syncCurrentState()">SAVE DATA</button>
-        <div id="save-ts">NOT SAVED</div>
+        YARD SNACKS: <span id="snack-count">0</span>
+        <button id="save-btn" class="pulse" onclick="syncCurrentState()">SAVE</button>
+        <div id="save-ts" style="font-size:10px; margin-top:5px;">OFFLINE</div>
     </div>
 </div>
 
 <div id="kennel-view"></div>
 
 <div class="nav-tabs">
-    <button class="btn" onclick="showTab('map')">YARD</button>
-    <button class="btn" onclick="showTab('kennel')">KENNEL</button>
-    <button class="btn" style="background:#ff3333; color:white;" onclick="clearAllSnacks()">CLEAN YARD</button>
+    <button class="btn" style="background:#00d4ff" onclick="showTab('map')">YARD</button>
+    <button class="btn" style="background:#00d4ff" onclick="showTab('kennel')">KENNEL</button>
+    <button id="clean-btn" class="btn" style="background:#ff3333; color:white;" onclick="clearAllSnacks()">YARD CLEANED!</button>
 </div>
 
 <script>
     let markers = [], placementMode = false;
     let scn, cam, rnd, ctrl, briggs;
-    const BIN_ID = "whereiszack_bully_poops_final";
-    const iglooPos = { lng: -122.316167, lat: 47.490222 };
+
+    // --- JSONBin Cloud Config ---
+    const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy"; 
+    const BIN_ID = "694fc0c8d0ea881f40433700"; 
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
 
     function setSaveUI(saved) {
         const btn = document.getElementById('save-btn');
-        btn.innerText = saved ? "SAVED ✓" : "SAVE DATA";
+        btn.innerText = saved ? "SAVED ✓" : "SAVE";
         btn.style.background = saved ? "#28a745" : "#ff3333";
         btn.classList.toggle('pulse', !saved);
         document.getElementById('save-ts').innerText = saved ? "SYNCED TO CLOUD" : "UNSAVED CHANGES";
@@ -89,21 +93,17 @@
 
     async function syncCurrentState() {
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
-        
-        // This is the most compatible "Old School" way to send data
-        // It treats the JSON like a simple text string to avoid CORS "Pre-flight" blocks
         try {
-            const res = await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`, {
-                method: 'POST',
-                mode: 'no-cors', // Force bypass security headers
-                headers: { 'Content-Type': 'text/plain' },
+            const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-Master-Key': API_KEY 
+                },
                 body: JSON.stringify(data)
             });
-            // Since 'no-cors' doesn't return status, we assume success if no error thrown
-            setSaveUI(true);
-        } catch (e) {
-            alert("Save failed. Check internet connection.");
-        }
+            if(res.ok) setSaveUI(true);
+        } catch (e) { console.error("Sync Error"); }
     }
 
     function createMarker(lng, lat) {
@@ -118,8 +118,9 @@
     function togglePlacementMode() { placementMode = !placementMode; document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; }
     
     function collectSnack(m) {
+        const igloo = { lng: -122.316167, lat: 47.490222 };
         const obj = { lng: m.getLngLat().lng, lat: m.getLngLat().lat };
-        gsap.to(obj, { lng: iglooPos.lng, lat: iglooPos.lat, duration: 0.8, onUpdate: () => m.setLngLat([obj.lng, obj.lat]), onComplete: () => {
+        gsap.to(obj, { lng: igloo.lng, lat: igloo.lat, duration: 0.8, onUpdate: () => m.setLngLat([obj.lng, obj.lat]), onComplete: () => {
             m.remove(); markers = markers.filter(x => x !== m);
             document.getElementById('snack-count').innerText = markers.length;
             setSaveUI(false); 
@@ -130,29 +131,31 @@
     function clearAllSnacks() { markers.slice().forEach(m => collectSnack(m)); }
 
     function initKennel() {
-        scn = new THREE.Scene(); 
+        scn = new THREE.Scene(); scn.background = new THREE.Color(0x050505);
         cam = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
         rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
-        // Deep, rich gold material
-        const goldMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffaa00, 
-            metalness: 1.0, 
-            roughness: 0.1,
-            emissive: 0x221100 // Adds internal glow for richness
-        });
+        // Premium Matcap Gold
+        const matcapTex = new THREE.TextureLoader().load('https://raw.githubusercontent.com/nidorx/matcaps/master/128/B7892D_F6E2AF_442A0C_765319-128px.png');
+        const goldMat = new THREE.MeshMatcapMaterial({ matcap: matcapTex });
 
-        // Background / Lighting
-        scn.add(new THREE.AmbientLight(0xffffff, 0.3));
-        const light1 = new THREE.PointLight(0xffffff, 1.5); light1.position.set(5, 5, 5); scn.add(light1);
-        const light2 = new THREE.PointLight(0xffffff, 1); light2.position.set(-5, 2, 5); scn.add(light2);
-
-        // Floor
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshStandardMaterial({color: 0x051105}));
+        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(15,15), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
         grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
+        scn.add(new THREE.AmbientLight(0xffffff, 1.0));
 
         const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat); ped.position.y = -1.5; scn.add(ped);
+
+        const fence = new THREE.Group();
+        const pick = new THREE.BoxGeometry(0.1, 1, 0.05);
+        for(let i=0; i<4; i++) {
+            const side = new THREE.Group();
+            for(let j=-6; j<=6; j+=0.5) { const p = new THREE.Mesh(pick, goldMat); p.position.x = j; side.add(p); }
+            side.position.z = 6; side.rotation.y = (Math.PI/2)*i;
+            if(i===1) side.position.set(6,0,0); if(i===2) side.position.set(0,0,-6); if(i===3) side.position.set(-6,0,0);
+            fence.add(side);
+        }
+        fence.position.y = -1.2; scn.add(fence);
 
         ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
         ctrl.maxPolarAngle = 1.65; cam.position.set(0, 0, 10);
@@ -167,12 +170,26 @@
     function animate() { requestAnimationFrame(animate); if(rnd) rnd.render(scn, cam); }
     function showTab(t) { 
         document.getElementById('kennel-view').style.display = (t==='kennel')?'block':'none';
+        document.getElementById('clean-btn').style.display = (t==='map')?'block':'none';
         if(t==='kennel') window.dispatchEvent(new Event('resize'));
     }
     
     initKennel(); animate();
-    // Auto-load data
-    fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)) d.forEach(p=>createMarker(p.lng,p.lat)); });
+
+    // Updated Cloud Fetch for JSONBin v3
+    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { 
+        headers: { 'X-Master-Key': API_KEY } 
+    }).then(r=>r.json()).then(d=>{ 
+        if(d.record && Array.isArray(d.record)) {
+            d.record.forEach(p => {
+                // Ensure placeholder doesn't create extra markers
+                if(p.lat !== 47.490222 || p.lng !== -122.316167 || markers.length === 0) {
+                    createMarker(p.lng, p.lat);
+                }
+            });
+            setSaveUI(true);
+        }
+    });
 </script>
 </body>
 </html>

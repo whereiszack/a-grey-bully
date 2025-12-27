@@ -21,8 +21,11 @@
         #save-btn { background: #ff3333; color: white; border: none; padding: 14px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; transition: 0.3s; }
         .pulse { animation: pulseRed 1.2s infinite; }
         @keyframes pulseRed { 0% { background: #ff3333; } 50% { background: #880000; } 100% { background: #ff3333; } }
+        
+        .syncing { background: #ffcc33 !important; color: black !important; animation: pulseYellow 0.8s infinite !important; }
+        @keyframes pulseYellow { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        #boost-btn { background: #222; color: #00ff66; border: 2px solid #00ff66; font-size: 11px; padding: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 180px; transition: 0.3s ease; border-radius: 4px; }
+        #boost-btn { background: #222; color: #00ff66; border: 2px solid #00ff66; font-size: 11px; padding: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 180px; border-radius: 4px; }
         #boost-btn.active { background: #00ff66; color: black; box-shadow: 0 0 20px rgba(0, 255, 102, 0.6); }
 
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
@@ -49,8 +52,8 @@
 
 <div id="celebration" onclick="this.style.display='none'">
     <div>
-        <h1 style="color:#ffcc33; font-size:48px; margin-bottom:10px;">SNACK PATROL<br>COMPLETE!</h1>
-        <p style="color:white; font-size:20px; font-weight:bold;">YARD SYNCED AT 0</p>
+        <h1 style="color:#ffcc33; font-size:48px; margin-bottom:10px;">YARD CLEANED!</h1>
+        <p style="color:white; font-size:20px; font-weight:bold;">DATABASE SYNCED TO ZERO</p>
         <p style="color:#aaa; margin-top:20px;">TAP TO CLOSE</p>
     </div>
 </div>
@@ -96,12 +99,10 @@
             map.setPaintProperty('satellite', 'raster-brightness-min', 0.22); 
             map.setPaintProperty('satellite', 'raster-brightness-max', 0.88); 
             map.setPaintProperty('satellite', 'raster-saturation', 0.35);      
-            map.setPaintProperty('satellite', 'raster-contrast', 0.1);         
         } else {
             map.setPaintProperty('satellite', 'raster-brightness-min', 0);
             map.setPaintProperty('satellite', 'raster-brightness-max', 1);
             map.setPaintProperty('satellite', 'raster-saturation', 0);
-            map.setPaintProperty('satellite', 'raster-contrast', 0);
         }
     }
 
@@ -118,22 +119,37 @@
 
     function setUnsaved() {
         const btn = document.getElementById('save-btn');
-        btn.innerText = "SAVE"; btn.style.background = "#ff3333"; btn.classList.add('pulse');
+        btn.innerText = "SAVE"; 
+        btn.style.background = "#ff3333"; 
+        btn.classList.add('pulse');
+        btn.classList.remove('syncing');
     }
 
+    // --- CRITICAL FIX: FORCE CLEARANCE ---
     function clearAllSnacks() { 
-        if (markers.length === 0) {
-            // Even if screen is empty, force a sync to make sure cloud is zeroed out
-            syncCurrentState();
-            return;
-        }
-        markers.slice().forEach(m => collectSnack(m)); 
+        // 1. Physically remove every marker from Mapbox
+        markers.forEach(m => m.remove());
+        // 2. Clear the local array
+        markers = [];
+        // 3. Update the UI count
+        updateUI();
+        // 4. Update the save button to show we need to sync this "zero"
+        setUnsaved();
+        // 5. Fire off the sync to the cloud immediately
+        syncCurrentState();
+        // 6. Show the celebration
+        document.getElementById('celebration').style.display = 'flex';
     }
 
     async function syncCurrentState() {
-        // This will now capture an empty array [] if no markers exist
+        const btn = document.getElementById('save-btn');
+        // Always map markers, even if it results in an empty array []
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
         
+        btn.innerText = "SYNCING...";
+        btn.classList.add('syncing');
+        btn.classList.remove('pulse');
+
         try {
             const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
@@ -142,13 +158,20 @@
                     'X-Master-Key': API_KEY, 
                     'X-Bin-Versioning': 'false' 
                 },
-                body: JSON.stringify(data) // Sends [] if yard is clean
+                body: JSON.stringify(data)
             });
+            
             if(res.ok) {
-                const btn = document.getElementById('save-btn');
-                btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
+                btn.innerText = "SAVED ✓"; 
+                btn.style.background = "#28a745"; 
+                btn.classList.remove('syncing');
+                btn.classList.remove('pulse');
             }
-        } catch (e) { console.error("Sync Error:", e); }
+        } catch (e) { 
+            console.error("Sync Error:", e);
+            btn.innerText = "RETRY SAVE";
+            btn.classList.remove('syncing');
+        }
     }
 
     function createMarker(lng, lat) {
@@ -178,13 +201,11 @@
         const igloo = { lng: -122.316167, lat: 47.490222 };
         const obj = { lng: m.getLngLat().lng, lat: m.getLngLat().lat };
         gsap.to(obj, { lng: igloo.lng, lat: igloo.lat, duration: 0.8, onUpdate: () => m.setLngLat([obj.lng, obj.lat]), onComplete: () => {
-            m.remove(); markers = markers.filter(x => x !== m);
+            m.remove(); 
+            markers = markers.filter(x => x !== m);
             updateUI();
             setUnsaved(); 
-            if(markers.length === 0) { 
-                document.getElementById('celebration').style.display = 'flex';
-                syncCurrentState(); // This is the crucial clean-yard sync
-            }
+            if(markers.length === 0) syncCurrentState();
         }});
     }
 
@@ -218,12 +239,10 @@
         }
         fence.position.y = -1.2; scn.add(fence);
         ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
-        ctrl.maxPolarAngle = 1.7; ctrl.minDistance = 2; ctrl.maxDistance = 22;
-        cam.position.set(0, 0, 11);
+        ctrl.maxPolarAngle = 1.7; ctrl.minDistance = 2; cam.position.set(0, 0, 11);
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
             briggs = g.scene; briggs.position.y = -1.25;
-            briggs.traverse(n => { if(n.isMesh) n.material = goldMat; }); 
-            scn.add(briggs);
+            briggs.traverse(n => { if(n.isMesh) n.material = goldMat; }); scn.add(briggs);
         });
     }
 
@@ -236,14 +255,12 @@
     }
     initKennel(); animate();
 
-    // Initial Load - Force Latest
+    // Forced Latest Load
     fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { 
         headers: { 'X-Master-Key': API_KEY } 
     })
     .then(r=>r.json()).then(d=>{ 
-        if(Array.isArray(d)) {
-            d.forEach(p => createMarker(p.lng, p.lat));
-        }
+        if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat));
         updateUI();
     });
 </script>

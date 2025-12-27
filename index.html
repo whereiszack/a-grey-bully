@@ -14,7 +14,7 @@
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
-        /* UI Components */
+        /* UI Overlay */
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .stats { pointer-events: auto; background: rgba(0,0,0,0.95); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; }
         
@@ -26,13 +26,14 @@
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         
-        /* Crosshair UI */
+        /* Crosshair & Cancel Overlay */
         #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 220px; height: 220px; pointer-events: none; }
         #crosshair { width: 100%; height: 100%; border: 3px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.75); }
         #crosshair::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: #00ff00; opacity: 0.7; }
         #crosshair::after { content: ''; position: absolute; left: 50%; top: 0; width: 2px; height: 100%; background: #00ff00; opacity: 0.7; }
         
-        #cancel-x { position: absolute; top: -50px; left: -50px; background: #ff3333; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; cursor: pointer; pointer-events: auto; border: 3px solid white; z-index: 100; box-shadow: 0 0 20px rgba(255,0,0,0.8); }
+        /* High-Contrast Cancel X */
+        #cancel-x { position: absolute; top: -65px; left: -65px; background: #ff3333; color: white; width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; cursor: pointer; pointer-events: auto; border: 3px solid white; z-index: 100; box-shadow: 0 0 25px rgba(255,0,0,1); }
 
         #celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; justify-content: center; align-items: center; text-align: center; }
     </style>
@@ -44,7 +45,7 @@
 <div id="crosshair-container">
     <div id="cancel-x" onclick="togglePlacementMode()">✕</div>
     <div id="crosshair" onclick="fireSnack()">
-        <div style="position:absolute; top:50%; left:50%; width:8px; height:8px; background:red; border-radius:50%; transform:translate(-50%,-50%); box-shadow: 0 0 12px red;"></div>
+        <div style="position:absolute; top:50%; left:50%; width:10px; height:10px; background:red; border-radius:50%; transform:translate(-50%,-50%); box-shadow: 0 0 15px red;"></div>
     </div>
 </div>
 
@@ -60,7 +61,7 @@
     <div class="stats">
         YARD SNACKS: <span id="snack-count">0</span>
         <button id="save-btn" class="pulse" onclick="syncCurrentState()">SAVE</button>
-        <div id="save-ts" style="font-size:10px; margin-top:5px;">OFFLINE</div>
+        <div id="save-ts" style="font-size:10px; margin-top:5px;">CLOUD READY</div>
     </div>
 </div>
 
@@ -76,7 +77,6 @@
     let markers = [], placementMode = false;
     let scn, cam, rnd, ctrl, briggs;
 
-    // --- JSONBin Cloud Config ---
     const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy"; 
     const BIN_ID = "694fc0c8d0ea881f40433700"; 
 
@@ -88,7 +88,7 @@
         btn.innerText = saved ? "SAVED ✓" : "SAVE";
         btn.style.background = saved ? "#28a745" : "#ff3333";
         btn.classList.toggle('pulse', !saved);
-        document.getElementById('save-ts').innerText = saved ? "SYNCED TO CLOUD" : "UNSAVED CHANGES";
+        document.getElementById('save-ts').innerText = saved ? "CLOUD SYNCED" : "UNSAVED CHANGES";
     }
 
     async function syncCurrentState() {
@@ -96,10 +96,7 @@
         try {
             const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'X-Master-Key': API_KEY 
-                },
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
                 body: JSON.stringify(data)
             });
             if(res.ok) setSaveUI(true);
@@ -136,16 +133,31 @@
         rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
-        // Premium Matcap Gold
-        const matcapTex = new THREE.TextureLoader().load('https://raw.githubusercontent.com/nidorx/matcaps/master/128/B7892D_F6E2AF_442A0C_765319-128px.png');
-        const goldMat = new THREE.MeshMatcapMaterial({ matcap: matcapTex });
+        // High-Luster Gold
+        const goldMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffbb33, 
+            metalness: 1.0, 
+            roughness: 0.1
+        });
 
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(15,15), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
+        // Floor Restoration
+        const grassCanvas = document.createElement('canvas'); grassCanvas.width = 64; grassCanvas.height = 64;
+        const gCtx = grassCanvas.getContext('2d');
+        gCtx.fillStyle = '#1a331a'; gCtx.fillRect(0,0,64,64);
+        for(let i=0; i<150; i++) { gCtx.fillStyle = '#224a22'; gCtx.fillRect(Math.random()*64, Math.random()*64, 2, 2); }
+        const grassTex = new THREE.CanvasTexture(grassCanvas); grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(12,12);
+        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshStandardMaterial({map: grassTex})); 
         grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
-        scn.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+        // LIGHTING: Strong ambient for yard visibility, multi-directional for gold depth
+        scn.add(new THREE.HemisphereLight(0xffffff, 0x000000, 1.5)); 
+        const p1 = new THREE.PointLight(0xffffff, 2.5); p1.position.set(5, 5, 5); scn.add(p1);
+        const p2 = new THREE.PointLight(0xffffff, 2.5); p2.position.set(-5, 5, 5); scn.add(p2);
+        const p3 = new THREE.PointLight(0xffffff, 1.5); p3.position.set(0, 10, -5); scn.add(p3);
 
         const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat); ped.position.y = -1.5; scn.add(ped);
 
+        // Fence Restoration
         const fence = new THREE.Group();
         const pick = new THREE.BoxGeometry(0.1, 1, 0.05);
         for(let i=0; i<4; i++) {
@@ -158,7 +170,7 @@
         fence.position.y = -1.2; scn.add(fence);
 
         ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
-        ctrl.maxPolarAngle = 1.65; cam.position.set(0, 0, 10);
+        ctrl.maxPolarAngle = 1.65; cam.position.set(0, 0, 12);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
             briggs = g.scene; briggs.position.y = -1.25;
@@ -168,25 +180,22 @@
     }
 
     function animate() { requestAnimationFrame(animate); if(rnd) rnd.render(scn, cam); }
+    
+    // TAB LOGIC: Specifically hiding the Yard Cleaned button on the Kennel tab
     function showTab(t) { 
-        document.getElementById('kennel-view').style.display = (t==='kennel')?'block':'none';
-        document.getElementById('clean-btn').style.display = (t==='map')?'block':'none';
-        if(t==='kennel') window.dispatchEvent(new Event('resize'));
+        const isKennel = (t === 'kennel');
+        document.getElementById('kennel-view').style.display = isKennel ? 'block' : 'none';
+        document.getElementById('clean-btn').style.display = isKennel ? 'none' : 'block';
+        if(isKennel) window.dispatchEvent(new Event('resize'));
     }
     
     initKennel(); animate();
 
-    // Updated Cloud Fetch for JSONBin v3
-    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { 
-        headers: { 'X-Master-Key': API_KEY } 
-    }).then(r=>r.json()).then(d=>{ 
+    // Initial Fetch
+    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } })
+    .then(r=>r.json()).then(d=>{ 
         if(d.record && Array.isArray(d.record)) {
-            d.record.forEach(p => {
-                // Ensure placeholder doesn't create extra markers
-                if(p.lat !== 47.490222 || p.lng !== -122.316167 || markers.length === 0) {
-                    createMarker(p.lng, p.lat);
-                }
-            });
+            d.record.forEach(p => createMarker(p.lng, p.lat));
             setSaveUI(true);
         }
     });

@@ -12,7 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; background: #111; }
         
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .controls-left { display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
@@ -22,9 +22,8 @@
         .pulse { animation: pulseRed 1.2s infinite; }
         @keyframes pulseRed { 0% { background: #ff3333; } 50% { background: #880000; } 100% { background: #ff3333; } }
 
-        /* Boost Button Style */
-        #boost-btn { background: #333; color: #00ff00; border: 2px solid #00ff00; font-size: 12px; padding: 8px; cursor: pointer; text-transform: uppercase; font-weight: bold; }
-        #boost-btn.active { background: #00ff00; color: black; box-shadow: 0 0 15px #00ff00; }
+        #boost-btn { background: #222; color: #ffcc33; border: 2px solid #ffcc33; font-size: 11px; padding: 8px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 160px; }
+        #boost-btn.active { background: #ffcc33; color: black; }
 
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
@@ -36,7 +35,6 @@
         #crosshair::after { content: ''; position: absolute; left: 50%; top: 20%; width: 3px; height: 60%; background: #00ff00; transform: translateX(-50%); }
         
         #cancel-x { position: absolute; top: -85px; left: -85px; background: #ff3333; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; cursor: pointer; pointer-events: auto; border: 4px solid white; z-index: 100; box-shadow: 0 0 30px rgba(255,0,0,1); }
-
         #celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; justify-content: center; align-items: center; text-align: center; }
     </style>
 </head>
@@ -52,14 +50,14 @@
 <div id="celebration" onclick="this.style.display='none'">
     <div>
         <h1 style="color:#ffcc33; font-size:48px; margin-bottom:10px;">SNACK PATROL<br>COMPLETE!</h1>
-        <p style="color:white; font-size:20px; font-weight:bold;">DATABASE UPDATED</p>
+        <p style="color:white; font-size:20px; font-weight:bold;">YARD SYNCED</p>
         <p style="color:#aaa; margin-top:20px;">TAP TO CLOSE</p>
     </div>
 </div>
 
 <div class="ui-header">
     <div class="controls-left">
-        <button id="boost-btn" class="active" onclick="toggleShadowBoost()">Shadow Boost: ON</button>
+        <button id="boost-btn" onclick="toggleShadowBoost()">SHADOW BOOST: OFF</button>
         <button class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
     </div>
     <div class="stats">
@@ -77,31 +75,43 @@
 </div>
 
 <script>
-    let markers = [], placementMode = false, shadowBoost = true;
+    let markers = [], placementMode = false, shadowBoost = false;
     let scn, cam, rnd, ctrl, briggs;
 
     const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy"; 
     const BIN_ID = "694fc0c8d0ea881f40433700"; 
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
-    const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
+    const map = new mapboxgl.Map({ 
+        container: 'map', 
+        style: 'mapbox://styles/mapbox/satellite-v9', 
+        center: [-122.316167, 47.490222], 
+        zoom: 19.5, 
+        bearing: 90,
+        antialias: true 
+    });
 
+    // Defensive Map Effects Function
     function applyMapEffects() {
-        if (!map.getLayer('satellite')) return;
-        map.setPaintProperty('satellite', 'raster-saturation', shadowBoost ? 0.4 : 0);
-        map.setPaintProperty('satellite', 'raster-contrast', shadowBoost ? 0.25 : 0);
+        if (!map.isStyleLoaded()) return;
+        const layer = map.getLayer('satellite');
+        if (!layer) return;
+
+        map.setPaintProperty('satellite', 'raster-saturation', shadowBoost ? 0.5 : 0);
+        map.setPaintProperty('satellite', 'raster-contrast', shadowBoost ? 0.3 : 0);
         map.setPaintProperty('satellite', 'raster-brightness-max', shadowBoost ? 0.7 : 1);
     }
 
     function toggleShadowBoost() {
         shadowBoost = !shadowBoost;
         const btn = document.getElementById('boost-btn');
-        btn.innerText = `Shadow Boost: ${shadowBoost ? 'ON' : 'OFF'}`;
+        btn.innerText = `SHADOW BOOST: ${shadowBoost ? 'ON' : 'OFF'}`;
         btn.classList.toggle('active', shadowBoost);
         applyMapEffects();
     }
 
     map.on('style.load', applyMapEffects);
+    map.on('idle', applyMapEffects); // Secondary check to ensure map isn't black
 
     function setUnsaved() {
         const btn = document.getElementById('save-btn');
@@ -111,15 +121,13 @@
     async function syncCurrentState() {
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
         try {
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY, 'X-Bin-Versioning': 'false' },
                 body: JSON.stringify(data)
             });
-            if(res.ok) {
-                const btn = document.getElementById('save-btn');
-                btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
-            }
+            const btn = document.getElementById('save-btn');
+            btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
         } catch (e) { console.error(e); }
     }
 
@@ -175,4 +183,31 @@
             const tR = new THREE.Mesh(railGeo, goldMat); tR.position.y = 0.4; side.add(tR);
             const bR = new THREE.Mesh(railGeo, goldMat); bR.position.y = -0.4; side.add(bR);
             side.position.z = 6; side.rotation.y = (Math.PI/2)*i;
-            if(
+            if(i===1) side.position.set(6,0,0); if(i===2) side.position.set(0,0,-6); if(i===3) side.position.set(-6,0,0);
+            fence.add(side);
+        }
+        fence.position.y = -1.2; scn.add(fence);
+        ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
+        ctrl.maxPolarAngle = 1.7; ctrl.minDistance = 2; ctrl.maxDistance = 22;
+        cam.position.set(0, 0, 11);
+        new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
+            briggs = g.scene; briggs.position.y = -1.25;
+            briggs.traverse(n => { if(n.isMesh) n.material = goldMat; }); 
+            scn.add(briggs);
+        });
+    }
+
+    function animate() { requestAnimationFrame(animate); if(rnd) rnd.render(scn, cam); }
+    function showTab(t) { 
+        const k = (t==='kennel');
+        document.getElementById('kennel-view').style.display = k?'block':'none';
+        document.getElementById('clean-btn').style.display = k?'none':'block';
+        if(k) window.dispatchEvent(new Event('resize'));
+    }
+    initKennel(); animate();
+
+    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { headers: { 'X-Master-Key': API_KEY } })
+    .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat)); });
+</script>
+</body>
+</html>

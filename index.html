@@ -13,11 +13,9 @@
         body { margin: 0; padding: 0; font-family: sans-serif; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
-        /* Fixed UI Layout for Desktop/Mobile */
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 12px; border: 2px solid #00ff00; min-width: 150px; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 12px; border: 2px solid #00ff00; min-width: 180px; text-align: right; box-sizing: border-box; }
         
-        /* Crosshair for Manual Placement */
         #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; display: none; }
         #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #00ff00; }
         #crosshair::before { width: 40px; height: 2px; left: -20px; top: 0; }
@@ -26,7 +24,7 @@
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #222, #000); display: none; z-index: 20; }
         .nav-tabs { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 30; }
         
-        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 15px 25px; font-weight: bold; border-radius: 30px; cursor: pointer; text-transform: uppercase; font-size: 14px; }
+        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 15px 25px; font-weight: bold; border-radius: 30px; cursor: pointer; text-transform: uppercase; font-size: 14px; white-space: nowrap; }
         .btn-blue { background: #00d4ff; }
         .btn-red { background: #ff4d4d; color: white; }
     </style>
@@ -39,11 +37,11 @@
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG POOP</button>
-        <div id="tip-text" style="margin-top:10px; font-size:12px; display:none; color:#00ff00;">MOVE MAP TO AIM, TAP AGAIN TO DROP</div>
+        <div id="tip-text" style="margin-top:10px; font-size:12px; display:none; color:#00ff00; text-shadow: 1px 1px 2px black;">AIM WITH CROSSHAIR, TAP BUTTON AGAIN</div>
     </div>
     <div class="stats">
         <b>SCRAPS:</b> <span id="scrap-count">0</span><br>
-        <b>STATUS:</b> <span id="reward-status">Level 1</span>
+        <b>STATUS:</b> <span id="reward-status">Level 1 Bully</span>
     </div>
 </div>
 
@@ -60,30 +58,24 @@
     let markers = [];
     let placementMode = false;
     const iglooPos = { lng: -122.316167, lat: 47.490222 };
-    const propertyCenter = [-122.316167, 47.490222]; // Center on igloo for focus
 
     // 1. Initialize Restricted Map
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/satellite-streets-v12',
-        center: propertyCenter,
+        center: [-122.316167, 47.490222],
         zoom: 19.5,
         pitch: 65,
-        maxBounds: [
-            [-122.3175, 47.4895], // Southwest
-            [-122.3150, 47.4910]  // Northeast
-        ],
+        maxBounds: [[-122.3180, 47.4890], [-122.3140, 47.4915]],
         antialias: true
     });
 
     map.on('style.load', () => {
         map.setFog({ 'range': [0.5, 3], 'color': '#000', 'high-color': '#222' });
-        map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1' });
-        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
     });
 
-    // 2. Crosshair / Manual Placement Logic
+    // 2. Crosshair Logic
     function togglePlacementMode() {
         placementMode = !placementMode;
         const crosshair = document.getElementById('crosshair');
@@ -110,30 +102,22 @@
         el.innerHTML = '💩';
         el.style.fontSize = '40px';
         el.style.filter = 'drop-shadow(0 0 10px black)';
-        el.style.cursor = 'pointer';
         
         const marker = new mapboxgl.Marker({ element: el })
             .setLngLat([lng, lat])
             .addTo(map);
-        
         markers.push(marker);
     }
 
-    // 3. The "Poop-nado" Animation
+    // 3. Poop-nado Animation
     function clearAllPoops() {
         if (markers.length === 0) return;
-        
         markers.forEach((m, index) => {
             const start = m.getLngLat();
             const proxy = { lng: start.lng, lat: start.lat, scale: 1 };
-            
             gsap.to(proxy, {
-                lng: iglooPos.lng,
-                lat: iglooPos.lat,
-                scale: 0.1,
-                duration: 1.5,
-                delay: index * 0.1,
-                ease: "back.in(1.7)",
+                lng: iglooPos.lng, lat: iglooPos.lat, scale: 0.1,
+                duration: 1.2, delay: index * 0.05, ease: "power2.in",
                 onUpdate: () => {
                     m.setLngLat([proxy.lng, proxy.lat]);
                     m.getElement().style.transform = `scale(${proxy.scale})`;
@@ -142,44 +126,58 @@
                     m.remove();
                     scraps += 10;
                     document.getElementById('scrap-count').innerText = scraps;
-                    updateRewards();
+                    if (scraps >= 100) document.getElementById('reward-status').innerText = "GOLD CHAIN EQUIPPED!";
                 }
             });
         });
         markers = [];
     }
 
-    // 4. Kennel & Briggs Loading
+    // 4. FIXED KENNEL & BRIGGS SCALE
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('kennel-view').appendChild(renderer.domElement);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+    
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const dLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dLight.position.set(5, 10, 5);
+    scene.add(dLight);
 
     let briggs;
     new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
         briggs = gltf.scene;
-        briggs.scale.set(30, 30, 30);
+        
+        // Auto-center and Auto-scale Briggs
+        const box = new THREE.Box3().setFromObject(briggs);
+        const center = box.getCenter(new THREE.Vector3());
+        briggs.position.sub(center); // Move model so its center is at 0,0,0
+        
+        briggs.scale.set(1, 1, 1); // Reset scale to 1 to test
         scene.add(briggs);
     });
 
-    camera.position.set(0, 1, 5);
+    // Camera moved further back (8 instead of 5)
+    camera.position.set(0, 0.5, 8); 
 
     function animate() {
         requestAnimationFrame(animate);
-        if (briggs) briggs.rotation.y += 0.01;
+        if (briggs) briggs.rotation.y += 0.005;
         renderer.render(scene, camera);
     }
     animate();
 
     function showTab(tab) {
         document.getElementById('kennel-view').style.display = tab === 'kennel' ? 'block' : 'none';
+        window.dispatchEvent(new Event('resize')); // Fixes squashed view
     }
 
-    function updateRewards() {
-        if (scraps >= 100) document.getElementById('reward-status').innerText = "GOLD CHAIN UNLOCKED!";
-    }
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 </script>
 </body>
 </html>

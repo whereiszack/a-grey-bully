@@ -14,20 +14,29 @@
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
+        /* UI */
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .stats { pointer-events: auto; background: rgba(0,0,0,0.95); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; }
         
-        #save-btn { background: #ff3333; color: white; border: none; padding: 14px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; }
+        #save-btn { background: #ff3333; color: white; border: none; padding: 14px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; transition: 0.3s; }
         .pulse { animation: pulseRed 1.2s infinite; }
         @keyframes pulseRed { 0% { background: #ff3333; } 50% { background: #880000; } 100% { background: #ff3333; } }
 
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #0a0a0a; }
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         
+        /* PLUS SIGN CROSSHAIR */
         #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 220px; height: 220px; pointer-events: none; }
         #crosshair { width: 100%; height: 100%; border: 3px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.75); }
-        #cancel-x { position: absolute; top: -70px; left: -70px; background: #ff3333; color: white; width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; cursor: pointer; pointer-events: auto; border: 3px solid white; z-index: 100; box-shadow: 0 0 25px rgba(255,0,0,1); }
+        /* The Plus Sign */
+        #crosshair::before { content: ''; position: absolute; top: 50%; left: 20%; width: 60%; height: 3px; background: #00ff00; transform: translateY(-50%); }
+        #crosshair::after { content: ''; position: absolute; left: 50%; top: 20%; width: 3px; height: 60%; background: #00ff00; transform: translateX(-50%); }
+        
+        /* CANCEL X - Pushed further upper-left */
+        #cancel-x { position: absolute; top: -85px; left: -85px; background: #ff3333; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; cursor: pointer; pointer-events: auto; border: 4px solid white; z-index: 100; box-shadow: 0 0 30px rgba(255,0,0,1); }
+
+        #celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; justify-content: center; align-items: center; text-align: center; }
     </style>
 </head>
 <body>
@@ -36,15 +45,21 @@
 
 <div id="crosshair-container">
     <div id="cancel-x" onclick="togglePlacementMode()">✕</div>
-    <div id="crosshair" onclick="fireSnack()">
-        <div style="position:absolute; top:50%; left:50%; width:10px; height:10px; background:red; border-radius:50%; transform:translate(-50%,-50%); box-shadow: 0 0 15px red;"></div>
+    <div id="crosshair" onclick="fireSnack()"></div>
+</div>
+
+<div id="celebration" onclick="this.style.display='none'">
+    <div>
+        <h1 style="color:#ffcc33; font-size:48px; margin-bottom:10px;">SNACK PATROL<br>COMPLETE!</h1>
+        <p style="color:white; font-size:20px; font-weight:bold;">YARD IS CLEAN</p>
+        <p style="color:#aaa; margin-top:20px;">TAP TO CLOSE</p>
     </div>
 </div>
 
 <div class="ui-header">
     <button class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
     <div class="stats">
-        SNACKS: <span id="snack-count">0</span>
+        YARD SNACKS: <span id="snack-count">0</span>
         <button id="save-btn" class="pulse" onclick="syncCurrentState()">SAVE</button>
     </div>
 </div>
@@ -60,11 +75,19 @@
 <script>
     let markers = [], placementMode = false;
     let scn, cam, rnd, ctrl, briggs;
+
     const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy"; 
     const BIN_ID = "694fc0c8d0ea881f40433700"; 
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
+
+    function setUnsaved() {
+        const btn = document.getElementById('save-btn');
+        btn.innerText = "SAVE";
+        btn.style.background = "#ff3333";
+        btn.classList.add('pulse');
+    }
 
     async function syncCurrentState() {
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
@@ -89,7 +112,7 @@
         el.onclick = () => { if(!placementMode) collectSnack(m); };
     }
 
-    function fireSnack() { createMarker(map.getCenter().lng, map.getCenter().lat); togglePlacementMode(); }
+    function fireSnack() { createMarker(map.getCenter().lng, map.getCenter().lat); setUnsaved(); togglePlacementMode(); }
     function togglePlacementMode() { placementMode = !placementMode; document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; }
     
     function collectSnack(m) {
@@ -98,6 +121,8 @@
         gsap.to(obj, { lng: igloo.lng, lat: igloo.lat, duration: 0.8, onUpdate: () => m.setLngLat([obj.lng, obj.lat]), onComplete: () => {
             m.remove(); markers = markers.filter(x => x !== m);
             document.getElementById('snack-count').innerText = markers.length;
+            setUnsaved(); 
+            if(markers.length === 0) { document.getElementById('celebration').style.display = 'flex'; }
         }});
     }
 
@@ -109,53 +134,63 @@
         rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
-        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 0.9, roughness: 0.2 });
+        // Deep Shining Gold Material (used for dog and fence)
+        const goldMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffcc33, 
+            metalness: 1.0, 
+            roughness: 0.15,
+            emissive: 0x221100 
+        });
 
-        // Grass stays inside (Plane matches fence area)
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x1a331a})); 
+        // Textured Grass Logic
+        const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#1a331a'; ctx.fillRect(0,0,128,128);
+        for(let i=0; i<400; i++){ ctx.fillStyle = '#2d5a2d'; ctx.fillRect(Math.random()*128, Math.random()*128, 2, 4); }
+        const grassTex = new THREE.CanvasTexture(canvas); grassTex.wrapS = THREE.RepeatWrapping; grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(10,10);
+        
+        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12.1, 12.1), new THREE.MeshStandardMaterial({map: grassTex})); 
         grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
 
-        // Brightened Lighting
-        scn.add(new THREE.AmbientLight(0xffffff, 1.2)); 
-        const light = new THREE.DirectionalLight(0xffffff, 1.0); light.position.set(5, 10, 7.5); scn.add(light);
+        // Bright Balanced Lighting
+        scn.add(new THREE.AmbientLight(0xffffff, 0.7)); 
+        const d1 = new THREE.DirectionalLight(0xffffff, 1.2); d1.position.set(5, 10, 7); scn.add(d1);
+        const d2 = new THREE.DirectionalLight(0xffffff, 0.5); d2.position.set(-5, 5, -5); scn.add(d2);
 
         const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat); ped.position.y = -1.5; scn.add(ped);
 
-        // Fence with Horizontal Rails
+        // Fence with Rails
         const fence = new THREE.Group();
-        const railGeo = new THREE.BoxGeometry(12, 0.05, 0.05);
-        const pick = new THREE.BoxGeometry(0.1, 1, 0.05);
-        
+        const railGeo = new THREE.BoxGeometry(12, 0.08, 0.08);
+        const pick = new THREE.BoxGeometry(0.12, 1.1, 0.06);
         for(let i=0; i<4; i++) {
             const side = new THREE.Group();
-            // Vertical Pickets
-            for(let j=-6; j<=6; j+=0.5) { 
-                const p = new THREE.Mesh(pick, goldMat); p.position.x = j; side.add(p); 
-            }
-            // Top and Bottom Rails
-            const topRail = new THREE.Mesh(railGeo, goldMat); topRail.position.y = 0.35; side.add(topRail);
-            const botRail = new THREE.Mesh(railGeo, goldMat); botRail.position.y = -0.35; side.add(botRail);
-            
+            for(let j=-6; j<=6; j+=0.4) { const p = new THREE.Mesh(pick, goldMat); p.position.x = j; side.add(p); }
+            const tR = new THREE.Mesh(railGeo, goldMat); tR.position.y = 0.4; side.add(tR);
+            const bR = new THREE.Mesh(railGeo, goldMat); bR.position.y = -0.4; side.add(bR);
             side.position.z = 6; side.rotation.y = (Math.PI/2)*i;
             if(i===1) side.position.set(6,0,0); if(i===2) side.position.set(0,0,-6); if(i===3) side.position.set(-6,0,0);
             fence.add(side);
         }
         fence.position.y = -1.2; scn.add(fence);
 
-        ctrl = new THREE.OrbitControls(cam, rnd.domElement); cam.position.set(0, 0, 12);
+        ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
+        ctrl.maxPolarAngle = Math.PI / 2.1; // STOPS CAMERA AT GRASS LEVEL
+        cam.position.set(0, 2, 12);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
             briggs = g.scene; briggs.position.y = -1.25;
-            briggs.traverse(n => { if(n.isMesh) n.material = goldMat; }); 
+            briggs.traverse(n => { if(n.isMesh) { n.material = goldMat; n.castShadow = true; } }); 
             scn.add(briggs);
         });
     }
 
     function animate() { requestAnimationFrame(animate); if(rnd) rnd.render(scn, cam); }
     function showTab(t) { 
-        document.getElementById('kennel-view').style.display = (t==='kennel')?'block':'none';
-        document.getElementById('clean-btn').style.display = (t==='kennel')?'none':'block';
-        if(t==='kennel') window.dispatchEvent(new Event('resize'));
+        const k = (t==='kennel');
+        document.getElementById('kennel-view').style.display = k?'block':'none';
+        document.getElementById('clean-btn').style.display = k?'none':'block';
+        if(k) window.dispatchEvent(new Event('resize'));
     }
     initKennel(); animate();
 

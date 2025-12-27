@@ -6,62 +6,71 @@
     <title>Seattle Snack Tracker</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: white; }
+        #map { position: absolute; inset: 0; z-index: 1; }
+        #kennel-view { position: absolute; inset: 0; background: #050505; z-index: 20; display: none; }
 
-        /* HUD LAYER - ALWAYS ON TOP */
-        #hud { position: absolute; inset: 0; pointer-events: none; z-index: 999; }
+        /* DARK OVERLAY (SCRIM) */
+        #scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10; display: none; pointer-events: none; }
+
+        /* UI HUD */
+        #hud { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
         .interactive { pointer-events: auto; }
 
-        /* Top Controls */
         .top-bar { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .stat-card { background: rgba(0,0,0,0.85); border: 2px solid #ffcc33; padding: 10px; border-radius: 8px; text-align: center; min-width: 120px; color: #ffcc33; }
+        .stat-card { background: rgba(0,0,0,0.9); border: 2px solid #ffcc33; padding: 10px; border-radius: 8px; text-align: center; color: #ffcc33; min-width: 100px; }
         
-        /* Buttons */
-        .btn-main { background: #ffcc33; color: #000; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; text-transform: uppercase; }
-        .btn-save { background: #ff3333; color: #fff; width: 100%; margin-top: 8px; border: none; padding: 10px; border-radius: 4px; font-weight: bold; }
-        .btn-clean { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #ff3333; color: white; padding: 16px 32px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+        #save-btn { background: #ff3333; color: white; border: none; width: 100%; margin-top: 8px; padding: 8px; font-weight: bold; border-radius: 4px; }
+        .syncing { animation: blink 0.8s infinite; background: #ffcc33 !important; color: black !important; }
 
         /* Crosshair System */
-        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
-        .crosshair-ring { width: 120px; height: 120px; border: 4px solid #00ff00; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 0 15px #00ff00; }
-        .crosshair-ring::before { content: ''; position: absolute; width: 30px; height: 4px; background: #00ff00; }
-        .crosshair-ring::after { content: ''; position: absolute; width: 4px; height: 30px; background: #00ff00; }
+        #crosshair-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; z-index: 15; }
+        .ring { width: 150px; height: 150px; border: 3px solid #00ff00; border-radius: 50%; position: relative; box-shadow: 0 0 20px #00ff00; }
+        .ring::after, .ring::before { content: ''; position: absolute; background: #00ff00; }
+        .ring::before { top: 50%; left: 10%; width: 80%; height: 2px; transform: translateY(-50%); }
+        .ring::after { left: 50%; top: 10%; width: 2px; height: 80%; transform: translateX(-50%); }
         
-        #cancel-btn { position: absolute; top: -50px; left: -50px; background: #ff3333; color: white; width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; font-size: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        #cancel-x { position: absolute; top: -60px; left: -60px; background: #ff3333; color: white; width: 50px; height: 50px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; cursor: pointer; }
 
-        /* Celebrations */
-        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; color: #ffcc33; z-index: 1000; text-align: center; }
+        /* Bottom Nav */
+        .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        .btn-tab { background: #00d4ff; color: black; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .btn-clean { background: #ff3333; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+
+        @keyframes blink { 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
+<div id="kennel-view"></div>
+<div id="scrim"></div>
 
 <div id="hud">
     <div class="top-bar">
-        <button class="btn-main interactive" onclick="setMode(true)">➕ LOG SNACK</button>
+        <button class="btn-tab interactive" style="background:#ffcc33" onclick="toggleMode(true)">➕ LOG SNACK</button>
         <div class="stat-card">
-            <div style="font-size: 12px; margin-bottom: 4px;">SNACKS</div>
-            <div id="count" style="font-size: 24px; font-weight: bold;">0</div>
-            <button id="save-btn" class="btn-save interactive" onclick="syncData()">SAVE</button>
+            <div style="font-size:10px">YARD SNACKS</div>
+            <div id="count" style="font-size:24px; font-weight:bold;">0</div>
+            <button id="save-btn" class="interactive" onclick="syncData()">SAVE</button>
         </div>
     </div>
 
-    <div id="crosshair-container">
-        <button id="cancel-btn" class="interactive" onclick="setMode(false)">✕</button>
-        <div class="crosshair-ring interactive" onclick="dropSnack()"></div>
+    <div id="crosshair-ui">
+        <div id="cancel-x" class="interactive" onclick="toggleMode(false)">✕</div>
+        <div class="ring interactive" onclick="dropSnack()"></div>
     </div>
 
-    <button class="btn-clean interactive" onclick="clearYard()">YARD CLEANED!</button>
-</div>
-
-<div id="overlay" onclick="this.style.display='none'">
-    <h1 style="font-size: 48px; margin: 0;">CLEAN!</h1>
-    <p style="color: white;">DATABASE ZEROED</p>
-    <p style="color: #666; margin-top: 20px;">TAP TO DISMISS</p>
+    <div class="nav-tabs">
+        <button class="btn-tab interactive" onclick="showTab('map')">YARD</button>
+        <button class="btn-tab interactive" onclick="showTab('kennel')">KENNEL</button>
+        <button id="clean-btn" class="btn-clean interactive" onclick="clearYard()">YARD CLEANED!</button>
+    </div>
 </div>
 
 <script>
@@ -70,25 +79,23 @@
     let markers = [];
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
-    
     const map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/satellite-v9',
         center: [-122.316167, 47.490222],
         zoom: 19.5,
-        bearing: 270, // Adjusted for East-at-top
-        pitch: 0,
-        antialias: true
+        bearing: 270 // East at top
     });
 
-    function setMode(active) {
-        document.getElementById('crosshair-container').style.display = active ? 'block' : 'none';
+    function toggleMode(active) {
+        document.getElementById('crosshair-ui').style.display = active ? 'block' : 'none';
+        document.getElementById('scrim').style.display = active ? 'block' : 'none';
     }
 
     function dropSnack() {
         const { lng, lat } = map.getCenter();
         createMarker(lng, lat);
-        setMode(false);
+        toggleMode(false);
         const sBtn = document.getElementById('save-btn');
         sBtn.innerText = "SAVE *";
         sBtn.style.background = "#ff3333";
@@ -96,10 +103,7 @@
 
     function createMarker(lng, lat) {
         const el = document.createElement('div');
-        el.innerHTML = '💩';
-        el.style.fontSize = '40px';
-        el.style.filter = 'drop-shadow(0 0 5px rgba(0,0,0,0.5))';
-        
+        el.innerHTML = '💩'; el.style.fontSize = '40px';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(m);
         document.getElementById('count').innerText = markers.length;
@@ -108,6 +112,7 @@
     async function syncData() {
         const btn = document.getElementById('save-btn');
         btn.innerText = "SYNCING...";
+        btn.classList.add('syncing');
         
         const payload = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
 
@@ -117,13 +122,13 @@
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY, 'X-Bin-Versioning': 'false' },
                 body: JSON.stringify(payload)
             });
-
             if (res.ok) {
                 btn.innerText = "SAVED ✓";
+                btn.classList.remove('syncing');
                 btn.style.background = "#28a745";
                 return true;
             }
-        } catch (e) { btn.innerText = "ERROR"; }
+        } catch (e) { btn.innerText = "ERROR"; btn.classList.remove('syncing'); }
         return false;
     }
 
@@ -131,12 +136,38 @@
         markers.forEach(m => m.remove());
         markers = [];
         document.getElementById('count').innerText = "0";
-        
         const ok = await syncData();
-        if (ok) {
-            confetti({ particleCount: 150, spread: 70, origin: { y: 0.7 } });
-            document.getElementById('overlay').style.display = 'flex';
-        }
+        if (ok) confetti({ particleCount: 150, spread: 70, origin: { y: 0.8 } });
+    }
+
+    function showTab(t) {
+        document.getElementById('kennel-view').style.display = (t === 'kennel') ? 'block' : 'none';
+        document.getElementById('clean-btn').style.display = (t === 'kennel') ? 'none' : 'block';
+        if(t === 'kennel' && !window.threeInited) initThree();
+    }
+
+    // --- THREE.JS KENNEL ---
+    function initThree() {
+        window.threeInited = true;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('kennel-view').appendChild(renderer.domElement);
+        
+        const light = new THREE.AmbientLight(0xffffff, 1); scene.add(light);
+        const gold = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 1, roughness: 0.2 });
+        
+        new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
+            const model = gltf.scene;
+            model.traverse(n => { if(n.isMesh) n.material = gold; });
+            scene.add(model);
+        });
+
+        camera.position.set(0, 1, 5);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        function anim() { requestAnimationFrame(anim); renderer.render(scene, camera); }
+        anim();
     }
 
     map.on('load', () => {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seattle Poop Tracker: Full Gear</title>
+    <title>Seattle Poop Tracker: Shadow Lifter</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -12,7 +12,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        
+        /* Map with default shadow-lift filter */
+        #map { 
+            position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; 
+            transition: filter 0.3s ease;
+            filter: brightness(1.1) contrast(1.1); /* Default lift */
+        }
         
         #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 160px; height: 160px; pointer-events: none; }
         #crosshair { width: 100%; height: 100%; border: 2px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.8); }
@@ -25,10 +31,6 @@
         .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 160px; }
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #000; }
         
-        #store-panel { position: absolute; right: 20px; top: 100px; width: 240px; background: rgba(0,0,0,0.95); border: 2px solid #00d4ff; padding: 15px; display: none; z-index: 40; border-radius: 8px; }
-        .store-item { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 15px; }
-        .store-item img { width: 45px; height: 45px; border-radius: 5px; object-fit: contain; }
-
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         .btn-blue { background: #00d4ff; }
@@ -46,30 +48,22 @@
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG POOP</button>
-        <button class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleNightMode()">💡 LIGHTS</button>
+        <button id="lights-btn" class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 BOOST LIGHT</button>
     </div>
     <div class="stats">SCRAPS: <span id="scrap-count">0</span><br><span id="sync-status" style="font-size:10px; color:#ffcc33;">LIVE</span></div>
 </div>
 
-<div id="kennel-view">
-    <button class="btn btn-blue" style="position:absolute; top:20px; right:20px; z-index:41;" onclick="toggleStore()">🛒 SHOP</button>
-    <div id="store-panel">
-        <h3 style="margin:0 0 10px 0; color:#00d4ff; font-size:14px;">EQUIPMENT</h3>
-        <div class="store-item" onclick="equip('chain', 100)"><img src="https://cdn-icons-png.flaticon.com/512/861/861057.png"><div><b>GOLD CHAIN</b><br><span style="font-size:10px; color:#ffcc33;">100 SCRAPS</span></div></div>
-        <div class="store-item" onclick="equip('glasses', 250)"><img src="https://cdn-icons-png.flaticon.com/512/655/655781.png"><div><b>SHADES</b><br><span style="font-size:10px; color:#ffcc33;">250 SCRAPS</span></div></div>
-        <div class="store-item" onclick="equip('hat', 500)"><img src="https://cdn-icons-png.flaticon.com/512/7322/7322301.png"><div><b>TAC HAT</b><br><span style="font-size:10px; color:#ffcc33;">500 SCRAPS</span></div></div>
-    </div>
-</div>
+<div id="kennel-view"></div>
 
 <div class="nav-tabs">
     <button class="btn btn-blue" onclick="showTab('map')">YARD</button>
     <button class="btn btn-blue" onclick="showTab('kennel')">KENNEL</button>
-    <button class="btn btn-red" onclick="clearAllPoops()">YARD CLEANED!</button>
+    <button id="clean-btn" class="btn btn-red" onclick="clearAllPoops()">YARD CLEANED!</button>
 </div>
 
 <script>
-    let scraps = 0, markers = [], placementMode = false, isNight = false;
-    let briggs, activeItems = { chain: null, glasses: null, hat: null };
+    let scraps = 0, markers = [], placementMode = false, boostActive = false;
+    let briggs;
     const BIN_ID = "whereiszack_bully_poops", iglooPos = { lng: -122.316167, lat: 47.490222 };
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
@@ -80,7 +74,21 @@
     map.on('mouseup', () => clearTimeout(pressTimer));
 
     function togglePlacementMode(s) { placementMode = (s !== undefined) ? s : !placementMode; document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; document.getElementById('log-btn').innerText = placementMode ? 'CANCEL' : '➕ LOG POOP'; }
-    function toggleNightMode() { isNight = !isNight; document.getElementById('map').style.filter = isNight ? 'brightness(0.3) contrast(1.2)' : 'brightness(1)'; }
+    
+    // Fixed Light Boost Function
+    function toggleLightBoost() {
+        boostActive = !boostActive;
+        const mapDiv = document.getElementById('map');
+        const btn = document.getElementById('lights-btn');
+        if (boostActive) {
+            mapDiv.style.filter = 'brightness(1.6) contrast(1.2) saturate(1.2)';
+            btn.innerText = '👓 RESET LIGHT';
+        } else {
+            mapDiv.style.filter = 'brightness(1.1) contrast(1.1)';
+            btn.innerText = '🔦 BOOST LIGHT';
+        }
+    }
+
     function firePoop() { const c = map.getCenter(); dropPoop(c.lng, c.lat, true); togglePlacementMode(false); }
 
     function dropPoop(lng, lat, sync) {
@@ -103,59 +111,72 @@
         if (newData) await fetch(url, { method: 'POST', body: JSON.stringify(newData) });
         else { const res = await fetch(url); if (res.ok) { const d = await res.json(); markers.forEach(m => m.remove()); markers = []; d.forEach(p => dropPoop(p.lng, p.lat, false)); } }
     }
-    function syncCurrent() { syncState(markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }))); }
 
     // --- KENNEL ---
-    const scn = new THREE.Scene(); scn.background = new THREE.Color(0x050505);
+    const scn = new THREE.Scene(); scn.background = new THREE.Color(0x020202);
     const cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
     const rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight); rnd.shadowMap.enabled = true;
     document.getElementById('kennel-view').appendChild(rnd.domElement);
-    const grnd = new THREE.Mesh(new THREE.PlaneGeometry(30,30), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; grnd.receiveShadow = true; scn.add(grnd);
-    const lght = new THREE.SpotLight(0xffaa33, 5); lght.position.set(0,8,2); lght.castShadow = true; scn.add(lght); scn.add(new THREE.AmbientLight(0xffaa33, 0.15));
-    const ctrl = new THREE.OrbitControls(cam, rnd.domElement); ctrl.maxPolarAngle = Math.PI/2 - 0.05;
+    
+    const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
+    grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; grnd.receiveShadow = true; scn.add(grnd);
+
+    const spot = new THREE.SpotLight(0xffaa33, 8); 
+    spot.position.set(0, 7, 0); spot.angle = Math.PI / 6; spot.penumbra = 0.8; spot.castShadow = true;
+    scn.add(spot);
+    scn.add(new THREE.AmbientLight(0xffaa33, 0.02));
+
+    function createFence() {
+        const fGroup = new THREE.Group();
+        const pGeom = new THREE.BoxGeometry(0.1, 0.8, 0.05);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+        for (let s = 0; s < 4; s++) {
+            const sGroup = new THREE.Group();
+            for (let i = -6; i <= 6; i += 0.4) {
+                const p = new THREE.Mesh(pGeom, mat); p.position.set(i, -1.1, 0);
+                sGroup.add(p);
+            }
+            sGroup.rotation.y = (Math.PI / 2) * s;
+            sGroup.position.x = s === 1 ? 6 : s === 3 ? -6 : 0;
+            sGroup.position.z = s === 0 ? 6 : s === 2 ? -6 : 0;
+            fGroup.add(sGroup);
+        }
+        scn.add(fGroup);
+    }
+    createFence();
+
+    const ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
+    ctrl.maxPolarAngle = Math.PI/2 - 0.1;
+    ctrl.enableDamping = true;
 
     new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
-        briggs = g.scene; briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.material.roughness = 0.8; } });
-        const b = new THREE.Box3().setFromObject(briggs); briggs.position.sub(b.getCenter(new THREE.Vector3())); briggs.position.y = -1.48; scn.add(briggs);
+        briggs = g.scene; 
+        briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.material.roughness = 0.7; } });
+        const b = new THREE.Box3().setFromObject(briggs); 
+        briggs.position.sub(b.getCenter(new THREE.Vector3())); 
+        briggs.position.y = -1.48; 
+        scn.add(briggs);
     });
-    cam.position.set(0, 1.5, 7);
-    function animate() { requestAnimationFrame(animate); ctrl.update(); rnd.render(scn, cam); }
+    cam.position.set(0, 1.5, 8);
+
+    function animate() { 
+        requestAnimationFrame(animate); 
+        ctrl.update(); 
+        // Breathing animation
+        if(briggs) {
+            const t = Date.now() * 0.002;
+            briggs.scale.set(1 + Math.sin(t) * 0.02, 1 + Math.sin(t) * 0.01, 1 + Math.sin(t) * 0.02);
+        }
+        rnd.render(scn, cam); 
+    }
     animate();
 
-    function showTab(t) { document.getElementById('kennel-view').style.display = t === 'kennel' ? 'block' : 'none'; if(t === 'kennel') window.dispatchEvent(new Event('resize')); }
-    function toggleStore() { let p = document.getElementById('store-panel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; }
-
-    function equip(item, cost) {
-        if (scraps < cost) return alert("Low Scraps!");
-        scraps -= cost; document.getElementById('scrap-count').innerText = scraps;
-        gsap.to(lght, { intensity: 20, duration: 0.2, yoyo: true, repeat: 1 });
-        if (item === 'chain') {
-            if (activeItems.chain) briggs.remove(activeItems.chain);
-            const g = new THREE.TorusGeometry(0.4, 0.05, 16, 100);
-            const m = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 1, roughness: 0.1 });
-            activeItems.chain = new THREE.Mesh(g, m);
-            activeItems.chain.rotation.x = Math.PI/2; activeItems.chain.position.set(0, -0.1, 0.8);
-            briggs.add(activeItems.chain);
-        } else if (item === 'glasses') {
-            if (activeItems.glasses) briggs.remove(activeItems.glasses);
-            const group = new THREE.Group();
-            const lg = new THREE.BoxGeometry(0.2, 0.15, 0.05);
-            const lm = new THREE.MeshStandardMaterial({ color: 0x000000 });
-            const l = new THREE.Mesh(lg, lm); const r = new THREE.Mesh(lg, lm);
-            l.position.x = -0.15; r.position.x = 0.15; group.add(l, r);
-            group.position.set(0, 0.35, 1.4); activeItems.glasses = group;
-            briggs.add(activeItems.glasses);
-        } else if (item === 'hat') {
-            if (activeItems.hat) briggs.remove(activeItems.hat);
-            const hg = new THREE.CylinderGeometry(0.4, 0.45, 0.2, 32);
-            const hm = new THREE.MeshStandardMaterial({ color: 0x3d4432 }); // Tactical Olive
-            const brim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.4), hm);
-            brim.position.set(0, -0.05, 0.3);
-            const hat = new THREE.Mesh(hg, hm); hat.add(brim);
-            hat.position.set(0, 0.7, 0.5); activeItems.hat = hat;
-            briggs.add(activeItems.hat);
-        }
-        alert(item + " equipped!");
+    function showTab(t) { 
+        const isK = t === 'kennel';
+        document.getElementById('kennel-view').style.display = isK ? 'block' : 'none';
+        document.getElementById('clean-btn').style.display = isK ? 'none' : 'block';
+        document.getElementById('lights-btn').style.display = isK ? 'none' : 'block';
+        if(isK) window.dispatchEvent(new Event('resize')); 
     }
 
     syncState(); setInterval(syncState, 20000);

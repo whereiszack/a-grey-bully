@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seattle Poop Tracker: Shared World</title>
+    <title>Seattle Poop Tracker: Pro Edition</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -14,7 +14,6 @@
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
         
-        /* Scope UI */
         #crosshair { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             z-index: 50; display: none; width: 120px; height: 120px; 
@@ -25,17 +24,15 @@
         .scope-dot { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px red; }
 
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.8); padding: 15px; border: 1px solid #00ff00; text-align: right; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #00ff00; text-align: right; box-shadow: 0 0 15px rgba(0,255,0,0.2); }
         
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; }
-        
-        /* Store UI */
-        #store-panel { position: absolute; right: 20px; top: 80px; width: 220px; background: rgba(0,0,0,0.95); border: 2px solid #00d4ff; padding: 15px; display: none; z-index: 40; }
-        .store-item { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 11px; }
-        .store-item img { width: 30px; height: 30px; border: 1px solid #444; background: #222; }
+        #store-panel { position: absolute; right: 20px; top: 100px; width: 220px; background: rgba(0,0,0,0.95); border: 2px solid #00d4ff; padding: 15px; display: none; z-index: 40; }
+        .store-item { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 15px; font-size: 11px; }
+        .store-item img { width: 35px; height: 35px; border-radius: 4px; background: #222; }
 
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
-        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         .btn-blue { background: #00d4ff; }
         .btn-red { background: #ff3333; color: white; }
     </style>
@@ -48,62 +45,72 @@
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG POOP</button>
+        <div style="font-size: 9px; color: #aaa; margin-top: 5px;">R-CLICK / LONG PRESS TO SNIPE</div>
     </div>
     <div class="stats">
         SCRAPS: <span id="scrap-count">0</span><br>
-        <span id="sync-status" style="font-size:10px; color:#00d4ff;">SYNCED</span>
+        <span id="sync-status" style="font-size:10px; color:#00d4ff;">LIVE</span>
     </div>
 </div>
 
 <div id="kennel-view">
     <button class="btn btn-blue" style="position:absolute; top:20px; right:20px; z-index:41;" onclick="toggleStore()">🛒 STORE</button>
     <div id="store-panel">
-        <h3 style="margin:0 0 10px 0; color:#00d4ff;">KENNEL SHOP</h3>
-        <div class="store-item" onclick="equip('chain')"><img src="https://img.icons8.com/emoji/48/gold-link-emoji.png"> GOLD CHAIN (100)</div>
-        <div class="store-item" onclick="equip('glasses')"><img src="https://img.icons8.com/emoji/48/dark-glasses-emoji.png"> SHADES (250)</div>
-        <div class="store-item" onclick="equip('hat')"><img src="https://img.icons8.com/emoji/48/billed-cap.png"> TRUCKER HAT (500)</div>
+        <h3 style="margin:0 0 10px 0; color:#00d4ff;">SHOP</h3>
+        <div class="store-item" onclick="equip('chain')"><img src="https://cdn-icons-png.flaticon.com/512/861/861057.png"> GOLD CHAIN (100)</div>
+        <div class="store-item" onclick="equip('glasses')"><img src="https://cdn-icons-png.flaticon.com/512/655/655781.png"> SHADES (250)</div>
+        <div class="store-item" onclick="equip('hat')"><img src="https://cdn-icons-png.flaticon.com/512/7322/7322301.png"> TACTICAL HAT (500)</div>
     </div>
 </div>
 
 <div class="nav-tabs">
     <button class="btn btn-blue" onclick="showTab('map')">YARD</button>
     <button class="btn btn-blue" onclick="showTab('kennel')">KENNEL</button>
-    <button class="btn btn-red" onclick="clearAllPoops()">CLEAR ALL</button>
+    <button class="btn btn-red" onclick="clearAllPoops()">YARD CLEANED!</button>
 </div>
 
 <script>
     let scraps = 0;
     let markers = [];
     let placementMode = false;
-    const BIN_ID = "whereiszack_bully_poops"; // Shared key for you and your neighbor
+    const BIN_ID = "whereiszack_bully_poops";
     const iglooPos = { lng: -122.316167, lat: 47.490222 };
 
-    // 1. Mapbox Initialization
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/satellite-streets-v12',
         center: [-122.316167, 47.490222],
         zoom: 19.5,
-        pitch: 65,
+        pitch: 0,
+        bearing: 90,
         maxBounds: [[-122.3180, 47.4890], [-122.3140, 47.4915]]
     });
 
-    // 2. Shared World Logic (Syncing)
+    let pressTimer;
+    map.on('mousedown', (e) => { 
+        if (e.originalEvent.button === 2) { togglePlacementMode(); return; }
+        pressTimer = window.setTimeout(() => togglePlacementMode(), 800);
+    });
+    map.on('mouseup', () => clearTimeout(pressTimer));
+    window.oncontextmenu = (e) => { if (placementMode) e.preventDefault(); };
+
     async function syncData(newData = null) {
-        document.getElementById('sync-status').innerText = "SYNCING...";
+        document.getElementById('sync-status').innerText = "SYNC...";
         const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
-        if (newData) {
-            await fetch(url, { method: 'POST', body: JSON.stringify(newData) });
-        } else {
-            const res = await fetch(url);
-            if (res.ok) {
-                const data = await res.json();
-                markers.forEach(m => m.remove());
-                markers = [];
-                data.forEach(p => dropPoop(p.lng, p.lat, false));
+        try {
+            if (newData) {
+                await fetch(url, { method: 'POST', body: JSON.stringify(newData) });
+            } else {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    markers.forEach(m => m.remove());
+                    markers = [];
+                    data.forEach(p => dropPoop(p.lng, p.lat, false));
+                }
             }
-        }
+        } catch(e) {}
         document.getElementById('sync-status').innerText = "LIVE";
     }
 
@@ -121,23 +128,64 @@
 
     function dropPoop(lng, lat, shouldSync) {
         const el = document.createElement('div');
-        el.innerHTML = '💩'; el.style.fontSize = '40px';
+        el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
         const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(marker);
-        if (shouldSync) {
-            const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
-            syncData(data);
-        }
+        el.addEventListener('click', (e) => {
+            if (placementMode) return;
+            e.stopPropagation();
+            collectPoop(marker);
+        });
+        if (shouldSync) syncCurrentState();
+    }
+
+    function collectPoop(m) {
+        const start = m.getLngLat();
+        const proxy = { lng: start.lng, lat: start.lat, scale: 1 };
+        gsap.to(proxy, {
+            lng: iglooPos.lng, lat: iglooPos.lat, scale: 0.1, duration: 0.8,
+            onUpdate: () => { m.setLngLat([proxy.lng, proxy.lat]); m.getElement().style.transform = `scale(${proxy.scale})`; },
+            onComplete: () => {
+                m.remove();
+                markers = markers.filter(x => x !== m);
+                addScraps(20);
+                syncCurrentState();
+            }
+        });
     }
 
     function clearAllPoops() {
-        if (!confirm("Clear the yard for everyone?")) return;
-        markers.forEach(m => m.remove());
-        markers = [];
-        syncData([]);
+        if (markers.length === 0) return;
+        let count = markers.length;
+        markers.forEach((m, i) => {
+            const start = m.getLngLat();
+            const proxy = { lng: start.lng, lat: start.lat, scale: 1 };
+            gsap.to(proxy, {
+                lng: iglooPos.lng, lat: iglooPos.lat, scale: 0.1, duration: 1, delay: i * 0.05,
+                onUpdate: () => { m.setLngLat([proxy.lng, proxy.lat]); m.getElement().style.transform = `scale(${proxy.scale})`; },
+                onComplete: () => {
+                    m.remove();
+                    if (i === count - 1) {
+                        markers = [];
+                        addScraps(count * 20);
+                        syncCurrentState();
+                    }
+                }
+            });
+        });
     }
 
-    // 3. High-Contrast Kennel Setup
+    function addScraps(val) {
+        scraps += val;
+        document.getElementById('scrap-count').innerText = scraps;
+    }
+
+    function syncCurrentState() {
+        const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
+        syncData(data);
+    }
+
+    // --- KENNEL UPDATED WITH CAMERA CONSTRAINTS ---
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050505);
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -146,29 +194,22 @@
     renderer.shadowMap.enabled = true;
     document.getElementById('kennel-view').appendChild(renderer.domElement);
 
-    // Grassy Ground
-    const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(20, 20),
-        new THREE.MeshStandardMaterial({ color: 0x113311 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1.5;
-    ground.receiveShadow = true;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x0a1a0a }));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; ground.receiveShadow = true;
     scene.add(ground);
 
-    // Overhead Street Light (High Contrast)
-    const streetLight = new THREE.SpotLight(0xffffff, 2);
-    streetLight.position.set(0, 10, 2);
-    streetLight.angle = Math.PI / 6;
-    streetLight.penumbra = 0.5;
-    streetLight.castShadow = true;
+    const streetLight = new THREE.SpotLight(0xffffff, 4);
+    streetLight.position.set(0, 8, 2); streetLight.castShadow = true;
     scene.add(streetLight);
-    
-    // Fill light to prevent total blackness
-    scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    
+    // CAMERA CONSTRAINTS: Prevent going below the floor
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; // Lock at horizon level
+    controls.minDistance = 3;  // Prevent zooming into the dog's brain
+    controls.maxDistance = 15; // Prevent zooming out to space
 
     let briggs;
     new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
@@ -176,12 +217,12 @@
         briggs.traverse(n => { if(n.isMesh) n.castShadow = true; });
         const box = new THREE.Box3().setFromObject(briggs);
         const center = box.getCenter(new THREE.Vector3());
-        briggs.position.sub(center);
-        briggs.position.y = -1.45; // Sit on grass
+        briggs.position.sub(center); 
+        briggs.position.y = -1.48; // Slight adjustment to sit flush on grass
         scene.add(briggs);
     });
 
-    camera.position.set(0, 2, 8);
+    camera.position.set(0, 1.5, 7);
 
     function animate() {
         requestAnimationFrame(animate);
@@ -201,12 +242,10 @@
         p.style.display = p.style.display === 'none' ? 'block' : 'none';
     }
 
-    function equip(item) { alert("Purchase Recorded! Scraps used."); }
+    function equip(item) { alert(item + " purchased! Scraps used."); }
 
-    // Initial Load
     syncData();
-    // Auto-refresh every 30 seconds
-    setInterval(syncData, 30000);
+    setInterval(syncData, 20000);
 
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;

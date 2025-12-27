@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seattle Poop Tracker Pro</title>
+    <title>Seattle Poop Tracker: Shared World</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -11,36 +11,39 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
         
-        .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 4px; border: 1px solid #00ff00; min-width: 180px; text-align: right; }
-        
-        /* Rifle Scope Reticle */
-        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; display: none; width: 100px; height: 100px; border: 2px solid #00ff00; border-radius: 50%; }
-        #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 140px; height: 1px; background: #00ff00; }
-        #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 140px; background: #00ff00; }
-        .scope-dot { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: red; border-radius: 50%; transform: translate(-50%, -50%); }
+        /* Scope UI */
+        #crosshair { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            z-index: 50; display: none; width: 120px; height: 120px; 
+            border: 2px solid #00ff00; border-radius: 50%; cursor: crosshair; pointer-events: auto;
+        }
+        #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 160px; height: 1px; background: rgba(0,255,0,0.5); }
+        #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 160px; background: rgba(0,255,0,0.5); }
+        .scope-dot { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px red; }
 
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #222, #000); display: none; z-index: 20; }
+        .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.8); padding: 15px; border: 1px solid #00ff00; text-align: right; }
+        
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; }
         
         /* Store UI */
-        #store-panel { position: absolute; right: 20px; top: 80px; width: 200px; background: rgba(0,0,0,0.9); border: 1px solid #00d4ff; padding: 15px; display: none; z-index: 40; border-radius: 8px; }
-        .store-item { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; font-size: 12px; }
-        .store-item:hover { background: #111; color: #00d4ff; }
+        #store-panel { position: absolute; right: 20px; top: 80px; width: 220px; background: rgba(0,0,0,0.95); border: 2px solid #00d4ff; padding: 15px; display: none; z-index: 40; }
+        .store-item { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 11px; }
+        .store-item img { width: 30px; height: 30px; border: 1px solid #444; background: #222; }
 
-        .nav-tabs { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 30; }
-        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 12px 20px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; }
+        .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
+        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn-blue { background: #00d4ff; }
-        .btn-red { background: #ff4d4d; color: white; }
-        .store-toggle { position: absolute; top: 20px; right: 20px; z-index: 41; }
+        .btn-red { background: #ff3333; color: white; }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
-<div id="crosshair"><div class="scope-dot"></div></div>
+<div id="crosshair" onclick="firePoop()"><div class="scope-dot"></div></div>
 
 <div class="ui-header">
     <div style="pointer-events: auto;">
@@ -48,33 +51,34 @@
     </div>
     <div class="stats">
         SCRAPS: <span id="scrap-count">0</span><br>
-        STATUS: <span id="reward-status">VETERAN CLEANER</span>
+        <span id="sync-status" style="font-size:10px; color:#00d4ff;">SYNCED</span>
     </div>
 </div>
 
 <div id="kennel-view">
-    <button class="btn btn-blue store-toggle" onclick="toggleStore()">🛒 ACCESSORIES</button>
+    <button class="btn btn-blue" style="position:absolute; top:20px; right:20px; z-index:41;" onclick="toggleStore()">🛒 STORE</button>
     <div id="store-panel">
-        <h3 style="margin-top:0; color:#00d4ff; font-size:14px;">DOGGY STORE</h3>
-        <div class="store-item" onclick="equip('chain')"><span>GOLD CHAIN</span> <span>100</span></div>
-        <div class="store-item" onclick="equip('glasses')"><span>SUNGLASSES</span> <span>250</span></div>
-        <div class="store-item" onclick="equip('hat')"><span>TACTICAL HAT</span> <span>500</span></div>
+        <h3 style="margin:0 0 10px 0; color:#00d4ff;">KENNEL SHOP</h3>
+        <div class="store-item" onclick="equip('chain')"><img src="https://img.icons8.com/emoji/48/gold-link-emoji.png"> GOLD CHAIN (100)</div>
+        <div class="store-item" onclick="equip('glasses')"><img src="https://img.icons8.com/emoji/48/dark-glasses-emoji.png"> SHADES (250)</div>
+        <div class="store-item" onclick="equip('hat')"><img src="https://img.icons8.com/emoji/48/billed-cap.png"> TRUCKER HAT (500)</div>
     </div>
 </div>
 
 <div class="nav-tabs">
-    <button class="btn btn-blue" onclick="showTab('map')">THE YARD</button>
-    <button class="btn btn-blue" onclick="showTab('kennel')">THE KENNEL</button>
-    <button class="btn btn-red" onclick="clearAllPoops()">CLEAR YARD</button>
+    <button class="btn btn-blue" onclick="showTab('map')">YARD</button>
+    <button class="btn btn-blue" onclick="showTab('kennel')">KENNEL</button>
+    <button class="btn btn-red" onclick="clearAllPoops()">CLEAR ALL</button>
 </div>
 
 <script>
     let scraps = 0;
     let markers = [];
     let placementMode = false;
+    const BIN_ID = "whereiszack_bully_poops"; // Shared key for you and your neighbor
     const iglooPos = { lng: -122.316167, lat: 47.490222 };
 
-    // 1. Mapbox
+    // 1. Mapbox Initialization
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({
         container: 'map',
@@ -85,63 +89,99 @@
         maxBounds: [[-122.3180, 47.4890], [-122.3140, 47.4915]]
     });
 
+    // 2. Shared World Logic (Syncing)
+    async function syncData(newData = null) {
+        document.getElementById('sync-status').innerText = "SYNCING...";
+        const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
+        if (newData) {
+            await fetch(url, { method: 'POST', body: JSON.stringify(newData) });
+        } else {
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                markers.forEach(m => m.remove());
+                markers = [];
+                data.forEach(p => dropPoop(p.lng, p.lat, false));
+            }
+        }
+        document.getElementById('sync-status').innerText = "LIVE";
+    }
+
     function togglePlacementMode() {
         placementMode = !placementMode;
         document.getElementById('crosshair').style.display = placementMode ? 'block' : 'none';
-        const btn = document.getElementById('log-btn');
-        if (placementMode) {
-            btn.innerText = '🎯 FIRE';
-            btn.style.background = 'red'; btn.style.color = 'white';
-        } else {
-            const center = map.getCenter();
-            dropPoop(center.lng, center.lat);
-            btn.innerText = '➕ LOG POOP';
-            btn.style.background = '#00ff00'; btn.style.color = 'black';
-        }
+        document.getElementById('log-btn').innerText = placementMode ? 'CANCEL' : '➕ LOG POOP';
     }
 
-    function dropPoop(lng, lat) {
+    function firePoop() {
+        const center = map.getCenter();
+        dropPoop(center.lng, center.lat, true);
+        togglePlacementMode();
+    }
+
+    function dropPoop(lng, lat, shouldSync) {
         const el = document.createElement('div');
         el.innerHTML = '💩'; el.style.fontSize = '40px';
         const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(marker);
+        if (shouldSync) {
+            const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
+            syncData(data);
+        }
     }
 
     function clearAllPoops() {
-        markers.forEach((m, i) => {
-            const start = m.getLngLat();
-            const proxy = { lng: start.lng, lat: start.lat, scale: 1 };
-            gsap.to(proxy, {
-                lng: iglooPos.lng, lat: iglooPos.lat, scale: 0.1, duration: 1, delay: i * 0.05,
-                onUpdate: () => { m.setLngLat([proxy.lng, proxy.lat]); m.getElement().style.transform = `scale(${proxy.scale})`; },
-                onComplete: () => { m.remove(); scraps += 10; document.getElementById('scrap-count').innerText = scraps; }
-            });
-        });
+        if (!confirm("Clear the yard for everyone?")) return;
+        markers.forEach(m => m.remove());
         markers = [];
+        syncData([]);
     }
 
-    // 2. Three.js Kennel with Controls
+    // 3. High-Contrast Kennel Setup
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050505);
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
     document.getElementById('kennel-view').appendChild(renderer.domElement);
+
+    // Grassy Ground
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(20, 20),
+        new THREE.MeshStandardMaterial({ color: 0x113311 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1.5;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Overhead Street Light (High Contrast)
+    const streetLight = new THREE.SpotLight(0xffffff, 2);
+    streetLight.position.set(0, 10, 2);
+    streetLight.angle = Math.PI / 6;
+    streetLight.penumbra = 0.5;
+    streetLight.castShadow = true;
+    scene.add(streetLight);
+    
+    // Fill light to prevent total blackness
+    scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.autoRotate = false; // Set to false to allow user manual control
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
     let briggs;
     new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
         briggs = gltf.scene;
+        briggs.traverse(n => { if(n.isMesh) n.castShadow = true; });
         const box = new THREE.Box3().setFromObject(briggs);
         const center = box.getCenter(new THREE.Vector3());
-        briggs.position.sub(center); 
+        briggs.position.sub(center);
+        briggs.position.y = -1.45; // Sit on grass
         scene.add(briggs);
     });
 
-    camera.position.set(0, 0, 8);
+    camera.position.set(0, 2, 8);
 
     function animate() {
         requestAnimationFrame(animate);
@@ -153,19 +193,20 @@
     function showTab(tab) {
         const isKennel = tab === 'kennel';
         document.getElementById('kennel-view').style.display = isKennel ? 'block' : 'none';
-        document.getElementById('store-panel').style.display = 'none';
         if(isKennel) window.dispatchEvent(new Event('resize'));
     }
 
     function toggleStore() {
-        const panel = document.getElementById('store-panel');
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        const p = document.getElementById('store-panel');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
     }
 
-    function equip(item) {
-        if (scraps < 100) { alert("Not enough scraps!"); return; }
-        alert("Equipped " + item + "! (Coming soon in 3D)");
-    }
+    function equip(item) { alert("Purchase Recorded! Scraps used."); }
+
+    // Initial Load
+    syncData();
+    // Auto-refresh every 30 seconds
+    setInterval(syncData, 30000);
 
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;

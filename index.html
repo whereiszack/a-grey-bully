@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seattle Poop Tracker & Kennel</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #111; color: white; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .ui-layer { position: absolute; z-index: 10; padding: 20px; width: 100%; pointer-events: none; }
+        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 15px 25px; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,255,0,0.3); font-size: 16px; }
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #333 0%, #000 100%); display: none; z-index: 20; }
+        .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; pointer-events: auto; }
+        .stats { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; border: 1px solid #00ff00; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="ui-layer">
+    <button class="btn" onclick="logPoop()">💩 LOG POOP</button>
+    <div class="stats">
+        SCRAPS: <span id="scrap-count">0</span><br>
+        REWARDS: <span id="reward-status">None</span>
+    </div>
+</div>
+
+<div id="kennel-view"></div>
+
+<div class="nav-tabs">
+    <button class="btn" style="background:#444; color:white;" onclick="showTab('map')">YARD MAP</button>
+    <button class="btn" style="background:#444; color:white;" onclick="showTab('kennel')">BRIGGS' KENNEL</button>
+    <button class="btn" style="background:red; color:white;" onclick="clearAll()">CLEAR YARD</button>
+</div>
+
+<script>
+    let scraps = 0;
+    const iglooCoords = [-122.316167, 47.490222]; // Corrected for Mapbox [Lng, Lat] format
+
+    // 1. Initialize Mapbox
+    mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/satellite-streets-v12',
+        center: [-122.3845, 47.5555],
+        zoom: 19,
+        pitch: 60,
+        antialias: true
+    });
+
+    map.on('style.load', () => {
+        map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+    });
+
+    // 2. Three.js Kennel Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('kennel-view').appendChild(renderer.domElement);
+
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 7.5).normalize();
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    const loader = new THREE.GLTFLoader();
+    let briggs;
+    loader.load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
+        briggs = gltf.scene;
+        briggs.scale.set(15, 15, 15); // Scaled up as requested
+        scene.add(briggs);
+    });
+
+    camera.position.z = 5;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (briggs) briggs.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // 3. App Logic
+    function showTab(tab) {
+        document.getElementById('kennel-view').style.display = tab === 'kennel' ? 'block' : 'none';
+    }
+
+    function logPoop() {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const el = document.createElement('div');
+            el.innerHTML = '💩';
+            el.style.fontSize = '30px';
+            el.style.cursor = 'pointer';
+            
+            const marker = new mapboxgl.Marker(el)
+                .setLngLat([pos.coords.longitude, pos.coords.latitude])
+                .addTo(map);
+
+            el.addEventListener('click', () => collectPoop(marker));
+        });
+    }
+
+    function collectPoop(marker) {
+        // Animation logic here (GSAP)
+        scraps += 10;
+        document.getElementById('scrap-count').innerText = scraps;
+        marker.remove();
+        if (scraps >= 100) document.getElementById('reward-status').innerText = "GOLD CHAIN UNLOCKED";
+    }
+
+    function clearAll() {
+        alert("Swoosh! All poops shoveled into the igloo.");
+        scraps = 0;
+        document.getElementById('scrap-count').innerText = scraps;
+    }
+</script>
+</body>
+</html>

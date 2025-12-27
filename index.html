@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seattle Poop Tracker: Pro Edition</title>
+    <title>Seattle Poop Tracker: Full Gear</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -12,31 +12,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
-        /* Scope UI with Flashlight Effect */
-        #crosshair { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            z-index: 50; display: none; width: 140px; height: 140px; 
-            border: 2px solid #00ff00; border-radius: 50%; cursor: crosshair; pointer-events: auto;
-            box-shadow: 0 0 0 2000px rgba(0,0,0,0.75); /* Darkens map except for scope */
-        }
-        #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 180px; height: 1px; background: rgba(0,255,0,0.5); }
-        #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 180px; background: rgba(0,255,0,0.5); }
-        .scope-dot { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px red; }
+        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 160px; height: 160px; pointer-events: none; }
+        #crosshair { width: 100%; height: 100%; border: 2px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.8); }
+        #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 200px; height: 1px; background: rgba(0,255,0,0.5); }
+        #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 200px; background: rgba(0,255,0,0.5); }
+        .scope-dot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px red; }
+        #scope-cancel { position: absolute; top: 0; left: 0; background: #ff3333; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; pointer-events: auto; border: 2px solid white; font-size: 14px; z-index: 51; }
 
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 160px; }
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #000; }
         
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; }
-        
-        /* STORE PANEL */
         #store-panel { position: absolute; right: 20px; top: 100px; width: 240px; background: rgba(0,0,0,0.95); border: 2px solid #00d4ff; padding: 15px; display: none; z-index: 40; border-radius: 8px; }
         .store-item { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 15px; }
-        .store-item:hover { background: rgba(0, 212, 255, 0.1); }
-        .store-item img { width: 40px; height: 40px; border-radius: 5px; background: #111; padding: 5px; }
-        .store-text { display: flex; flex-direction: column; }
-        .store-price { font-size: 10px; color: #ffcc33; margin-top: 3px; }
+        .store-item img { width: 45px; height: 45px; border-radius: 5px; object-fit: contain; }
 
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
@@ -47,36 +38,26 @@
 <body>
 
 <div id="map"></div>
-<div id="crosshair" onclick="firePoop()"><div class="scope-dot"></div></div>
+<div id="crosshair-container">
+    <div id="scope-cancel" onclick="togglePlacementMode(false)">X</div>
+    <div id="crosshair" onclick="firePoop()"><div class="scope-dot"></div></div>
+</div>
 
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG POOP</button>
         <button class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleNightMode()">💡 LIGHTS</button>
     </div>
-    <div class="stats">
-        SCRAPS: <span id="scrap-count">0</span><br>
-        <span id="sync-status" style="font-size:10px; color:#ffcc33;">SYNCED</span>
-    </div>
+    <div class="stats">SCRAPS: <span id="scrap-count">0</span><br><span id="sync-status" style="font-size:10px; color:#ffcc33;">LIVE</span></div>
 </div>
 
 <div id="kennel-view">
     <button class="btn btn-blue" style="position:absolute; top:20px; right:20px; z-index:41;" onclick="toggleStore()">🛒 SHOP</button>
-    
     <div id="store-panel">
         <h3 style="margin:0 0 10px 0; color:#00d4ff; font-size:14px;">EQUIPMENT</h3>
-        <div class="store-item" onclick="equip('Gold Chain', 100)">
-            <img src="https://cdn-icons-png.flaticon.com/512/861/861057.png">
-            <div class="store-text"><b>GOLD CHAIN</b><span class="store-price">100 SCRAPS</span></div>
-        </div>
-        <div class="store-item" onclick="equip('Shades', 250)">
-            <img src="https://cdn-icons-png.flaticon.com/512/655/655781.png">
-            <div class="store-text"><b>SHADES</b><span class="store-price">250 SCRAPS</span></div>
-        </div>
-        <div class="store-item" onclick="equip('Tactical Hat', 500)">
-            <img src="https://cdn-icons-png.flaticon.com/512/7322/7322301.png">
-            <div class="store-text"><b>TAC HAT</b><span class="store-price">500 SCRAPS</span></div>
-        </div>
+        <div class="store-item" onclick="equip('chain', 100)"><img src="https://cdn-icons-png.flaticon.com/512/861/861057.png"><div><b>GOLD CHAIN</b><br><span style="font-size:10px; color:#ffcc33;">100 SCRAPS</span></div></div>
+        <div class="store-item" onclick="equip('glasses', 250)"><img src="https://cdn-icons-png.flaticon.com/512/655/655781.png"><div><b>SHADES</b><br><span style="font-size:10px; color:#ffcc33;">250 SCRAPS</span></div></div>
+        <div class="store-item" onclick="equip('hat', 500)"><img src="https://cdn-icons-png.flaticon.com/512/7322/7322301.png"><div><b>TAC HAT</b><br><span style="font-size:10px; color:#ffcc33;">500 SCRAPS</span></div></div>
     </div>
 </div>
 
@@ -87,153 +68,98 @@
 </div>
 
 <script>
-    let scraps = 0;
-    let markers = [];
-    let placementMode = false;
-    let isNight = false;
-    const BIN_ID = "whereiszack_bully_poops";
-    const iglooPos = { lng: -122.316167, lat: 47.490222 };
+    let scraps = 0, markers = [], placementMode = false, isNight = false;
+    let briggs, activeItems = { chain: null, glasses: null, hat: null };
+    const BIN_ID = "whereiszack_bully_poops", iglooPos = { lng: -122.316167, lat: 47.490222 };
 
-    // 1. Mapbox Initialization
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
-    const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/standard-satellite',
-        center: [-122.316167, 47.490222],
-        zoom: 19.5,
-        pitch: 0,
-        bearing: 90,
-        config: { 'basemap': { 'lightPreset': 'day', 'showRoadsAndTransit': false } },
-        maxBounds: [[-122.3180, 47.4890], [-122.3140, 47.4915]]
-    });
+    const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
 
-    map.on('style.load', () => {
-        map.addSource('fence', { 'type': 'geojson', 'data': { 'type': 'Feature', 'geometry': { 'type': 'Polygon', 'coordinates': [[[-122.3165, 47.4905], [-122.3158, 47.4905], [-122.3158, 47.4899], [-122.3165, 47.4899], [-122.3165, 47.4905]]] } } });
-        map.addLayer({ 'id': 'fence-line', 'type': 'line', 'source': 'fence', 'paint': { 'line-color': '#ffffff', 'line-width': 4, 'line-dasharray': [2, 1] } });
-    });
+    let pressTimer;
+    map.on('mousedown', (e) => { if (e.originalEvent.button === 2) { togglePlacementMode(true); return; } pressTimer = setTimeout(() => togglePlacementMode(true), 700); });
+    map.on('mouseup', () => clearTimeout(pressTimer));
 
-    function toggleNightMode() {
-        isNight = !isNight;
-        map.setConfigProperty('basemap', 'lightPreset', isNight ? 'night' : 'day');
-    }
+    function togglePlacementMode(s) { placementMode = (s !== undefined) ? s : !placementMode; document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; document.getElementById('log-btn').innerText = placementMode ? 'CANCEL' : '➕ LOG POOP'; }
+    function toggleNightMode() { isNight = !isNight; document.getElementById('map').style.filter = isNight ? 'brightness(0.3) contrast(1.2)' : 'brightness(1)'; }
+    function firePoop() { const c = map.getCenter(); dropPoop(c.lng, c.lat, true); togglePlacementMode(false); }
 
-    function togglePlacementMode() {
-        placementMode = !placementMode;
-        document.getElementById('crosshair').style.display = placementMode ? 'block' : 'none';
-        document.getElementById('log-btn').innerText = placementMode ? 'CANCEL' : '➕ LOG POOP';
-    }
-
-    function firePoop() {
-        const center = map.getCenter();
-        dropPoop(center.lng, center.lat, true);
-        togglePlacementMode();
-    }
-
-    function dropPoop(lng, lat, shouldSync) {
-        const el = document.createElement('div');
-        el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
-        const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-        markers.push(marker);
-        el.addEventListener('click', (e) => { if (!placementMode) collectPoop(marker); });
-        if (shouldSync) syncCurrentState();
+    function dropPoop(lng, lat, sync) {
+        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
+        const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        markers.push(m);
+        el.addEventListener('click', () => { if (!placementMode) collectPoop(m); });
+        if (sync) syncState();
     }
 
     function collectPoop(m) {
-        const start = m.getLngLat();
-        const p = { lng: start.lng, lat: start.lat, scale: 1, rot: 0 };
-        gsap.to(p, {
-            lng: iglooPos.lng, lat: iglooPos.lat, scale: 0, rot: 720, duration: 1,
-            onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.scale}) rotate(${p.rot}deg)`; },
-            onComplete: () => { m.remove(); markers = markers.filter(x => x !== m); scraps += 20; document.getElementById('scrap-count').innerText = scraps; syncCurrentState(); }
-        });
+        const s = m.getLngLat(), p = { lng: s.lng, lat: s.lat, sc: 1 };
+        gsap.to(p, { lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 0.8, onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, onComplete: () => { m.remove(); markers = markers.filter(x => x !== m); scraps += 20; document.getElementById('scrap-count').innerText = scraps; syncState(); } });
     }
 
-    function clearAllPoops() {
-        if (markers.length === 0) return;
-        const total = markers.length * 20;
-        markers.forEach((m, i) => {
-            const start = m.getLngLat();
-            const p = { lng: start.lng, lat: start.lat, s: 1 };
-            gsap.to(p, {
-                lng: iglooPos.lng, lat: iglooPos.lat, s: 0, duration: 1, delay: i * 0.05,
-                onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.s})`; },
-                onComplete: () => { m.remove(); if(i === markers.length - 1) { markers = []; scraps += total; document.getElementById('scrap-count').innerText = scraps; syncCurrentState(); } }
-            });
-        });
-    }
+    function clearAllPoops() { if(markers.length === 0) return; let t = markers.length * 20; markers.forEach((m, i) => { const s = m.getLngLat(), p = { lng: s.lng, lat: s.lat, sc: 1 }; gsap.to(p, { lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 1, delay: i*0.05, onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, onComplete: () => { m.remove(); if(i === markers.length-1) { markers = []; scraps += t; document.getElementById('scrap-count').innerText = scraps; syncState(); } } }); }); }
 
-    async function syncData(newData = null) {
+    async function syncState(newData = null) {
         const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
         if (newData) await fetch(url, { method: 'POST', body: JSON.stringify(newData) });
-        else {
-            const res = await fetch(url);
-            if (res.ok) {
-                const data = await res.json();
-                markers.forEach(m => m.remove()); markers = [];
-                data.forEach(p => dropPoop(p.lng, p.lat, false));
-            }
-        }
+        else { const res = await fetch(url); if (res.ok) { const d = await res.json(); markers.forEach(m => m.remove()); markers = []; d.forEach(p => dropPoop(p.lng, p.lat, false)); } }
     }
-    function syncCurrentState() { syncData(markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }))); }
+    function syncCurrent() { syncState(markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }))); }
 
-    // --- KENNEL SECTION ---
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050505);
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.getElementById('kennel-view').appendChild(renderer.domElement);
+    // --- KENNEL ---
+    const scn = new THREE.Scene(); scn.background = new THREE.Color(0x050505);
+    const cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight); rnd.shadowMap.enabled = true;
+    document.getElementById('kennel-view').appendChild(rnd.domElement);
+    const grnd = new THREE.Mesh(new THREE.PlaneGeometry(30,30), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; grnd.receiveShadow = true; scn.add(grnd);
+    const lght = new THREE.SpotLight(0xffaa33, 5); lght.position.set(0,8,2); lght.castShadow = true; scn.add(lght); scn.add(new THREE.AmbientLight(0xffaa33, 0.15));
+    const ctrl = new THREE.OrbitControls(cam, rnd.domElement); ctrl.maxPolarAngle = Math.PI/2 - 0.05;
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x0a1a0a }));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; ground.receiveShadow = true;
-    scene.add(ground);
-
-    const warmLight = new THREE.SpotLight(0xffaa33, 5); // 2700K Yellow Light
-    warmLight.position.set(0, 8, 2); warmLight.castShadow = true; scene.add(warmLight);
-    scene.add(new THREE.AmbientLight(0xffaa33, 0.15));
-
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.maxPolarAngle = Math.PI / 2 - 0.05;
-    controls.enableDamping = true;
-
-    let briggs;
-    new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
-        briggs = gltf.scene;
-        briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.material.roughness = 0.8; } });
-        const box = new THREE.Box3().setFromObject(briggs);
-        briggs.position.sub(box.getCenter(new THREE.Vector3()));
-        briggs.position.y = -1.48;
-        scene.add(briggs);
+    new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
+        briggs = g.scene; briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.material.roughness = 0.8; } });
+        const b = new THREE.Box3().setFromObject(briggs); briggs.position.sub(b.getCenter(new THREE.Vector3())); briggs.position.y = -1.48; scn.add(briggs);
     });
-
-    camera.position.set(0, 1.5, 7);
-
-    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+    cam.position.set(0, 1.5, 7);
+    function animate() { requestAnimationFrame(animate); ctrl.update(); rnd.render(scn, cam); }
     animate();
 
-    function showTab(tab) {
-        document.getElementById('kennel-view').style.display = tab === 'kennel' ? 'block' : 'none';
-        if(tab === 'kennel') window.dispatchEvent(new Event('resize'));
-    }
-
-    function toggleStore() {
-        const p = document.getElementById('store-panel');
-        p.style.display = p.style.display === 'none' ? 'block' : 'none';
-    }
+    function showTab(t) { document.getElementById('kennel-view').style.display = t === 'kennel' ? 'block' : 'none'; if(t === 'kennel') window.dispatchEvent(new Event('resize')); }
+    function toggleStore() { let p = document.getElementById('store-panel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; }
 
     function equip(item, cost) {
-        if (scraps < cost) { alert("Insufficient Scraps!"); return; }
-        scraps -= cost;
-        document.getElementById('scrap-count').innerText = scraps;
-        // Level up flash effect
-        gsap.to(warmLight, { intensity: 20, duration: 0.2, yoyo: true, repeat: 1 });
+        if (scraps < cost) return alert("Low Scraps!");
+        scraps -= cost; document.getElementById('scrap-count').innerText = scraps;
+        gsap.to(lght, { intensity: 20, duration: 0.2, yoyo: true, repeat: 1 });
+        if (item === 'chain') {
+            if (activeItems.chain) briggs.remove(activeItems.chain);
+            const g = new THREE.TorusGeometry(0.4, 0.05, 16, 100);
+            const m = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 1, roughness: 0.1 });
+            activeItems.chain = new THREE.Mesh(g, m);
+            activeItems.chain.rotation.x = Math.PI/2; activeItems.chain.position.set(0, -0.1, 0.8);
+            briggs.add(activeItems.chain);
+        } else if (item === 'glasses') {
+            if (activeItems.glasses) briggs.remove(activeItems.glasses);
+            const group = new THREE.Group();
+            const lg = new THREE.BoxGeometry(0.2, 0.15, 0.05);
+            const lm = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            const l = new THREE.Mesh(lg, lm); const r = new THREE.Mesh(lg, lm);
+            l.position.x = -0.15; r.position.x = 0.15; group.add(l, r);
+            group.position.set(0, 0.35, 1.4); activeItems.glasses = group;
+            briggs.add(activeItems.glasses);
+        } else if (item === 'hat') {
+            if (activeItems.hat) briggs.remove(activeItems.hat);
+            const hg = new THREE.CylinderGeometry(0.4, 0.45, 0.2, 32);
+            const hm = new THREE.MeshStandardMaterial({ color: 0x3d4432 }); // Tactical Olive
+            const brim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.4), hm);
+            brim.position.set(0, -0.05, 0.3);
+            const hat = new THREE.Mesh(hg, hm); hat.add(brim);
+            hat.position.set(0, 0.7, 0.5); activeItems.hat = hat;
+            briggs.add(activeItems.hat);
+        }
         alert(item + " equipped!");
     }
 
-    syncData();
-    setInterval(syncData, 20000);
-    window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    syncState(); setInterval(syncState, 20000);
+    window.addEventListener('resize', () => { cam.aspect = window.innerWidth/window.innerHeight; cam.updateProjectionMatrix(); rnd.setSize(window.innerWidth, window.innerHeight); });
 </script>
 </body>
 </html>

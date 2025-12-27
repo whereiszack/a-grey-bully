@@ -19,7 +19,7 @@
         .interactive { pointer-events: auto; }
         .top-bar { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; }
         .stat-card { background: rgba(0,0,0,0.9); border: 2px solid #ffcc33; padding: 10px; border-radius: 8px; text-align: center; color: #ffcc33; min-width: 100px; }
-        #save-btn { background: #ff3333; color: white; border: none; width: 100%; margin-top: 8px; padding: 8px; font-weight: bold; border-radius: 4px; }
+        #save-btn { background: #ff3333; color: white; border: none; width: 100%; margin-top: 8px; padding: 8px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         #crosshair-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; z-index: 15; }
         .ring { width: 150px; height: 150px; border: 3px solid #00ff00; border-radius: 50%; position: relative; box-shadow: 0 0 20px #00ff00; }
         .ring::before { content: ''; position: absolute; top: 50%; left: 10%; width: 80%; height: 2px; background: #00ff00; transform: translateY(-50%); }
@@ -93,7 +93,7 @@
     async function syncData() {
         const btn = document.getElementById('save-btn');
         btn.innerText = "SYNCING...";
-        // If yard is empty, we force the Igloo seed
+        // Force the Igloo seed if empty to prevent JSONBin 0-length error
         const data = markers.length > 0 ? 
             markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat })) : 
             [IGLOO];
@@ -113,7 +113,7 @@
     function clearYard() {
         markers.forEach(m => m.remove());
         markers = [];
-        createMarker(IGLOO.lng, IGLOO.lat); // Visual seed
+        createMarker(IGLOO.lng, IGLOO.lat); 
         document.getElementById('count').innerText = "1";
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.8 } });
         syncData(); 
@@ -125,7 +125,6 @@
         if(t === 'kennel' && !window.threeInited) initKennel();
     }
 
-    // --- RESTORED KENNEL (Fence, Grass, Pedestal) ---
     function initKennel() {
         window.threeInited = true;
         const scn = new THREE.Scene();
@@ -136,18 +135,20 @@
         
         const goldMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 1.0, roughness: 0.15 });
         
-        // Grass Texture
+        // --- Grass Floor ---
         const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
         const ctx = canvas.getContext('2d'); ctx.fillStyle = '#1a331a'; ctx.fillRect(0,0,128,128);
         for(let i=0; i<400; i++){ ctx.fillStyle = '#2d5a2d'; ctx.fillRect(Math.random()*128, Math.random()*128, 2, 4); }
         const grassTex = new THREE.CanvasTexture(canvas); grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(10,10);
         
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12.1, 12.1), new THREE.MeshStandardMaterial({map: grassTex})); 
+        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12.5, 12.5), new THREE.MeshStandardMaterial({map: grassTex})); 
         grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
         
-        const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat); ped.position.y = -1.5; scn.add(ped);
+        // --- Pedestal ---
+        const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat); 
+        ped.position.y = -1.5; scn.add(ped);
 
-        // Fence Group
+        // --- Fence ---
         const fence = new THREE.Group();
         const railGeo = new THREE.BoxGeometry(12, 0.08, 0.08);
         const pick = new THREE.BoxGeometry(0.12, 1.1, 0.06);
@@ -162,16 +163,26 @@
         }
         fence.position.y = -1.2; scn.add(fence);
 
-        scn.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const d1 = new THREE.DirectionalLight(0xffffff, 1); d1.position.set(5,10,5); scn.add(d1);
+        // --- Lighting (Boosted for visibility) ---
+        scn.add(new THREE.AmbientLight(0xffffff, 0.6)); // Soft base light
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.2); mainLight.position.set(5,10,7); scn.add(mainLight);
+        const fillLight = new THREE.PointLight(0xffffff, 0.8); fillLight.position.set(-5, 2, -5); scn.add(fillLight);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
             const briggs = g.scene; briggs.position.y = -1.25;
             briggs.traverse(n => { if(n.isMesh) n.material = goldMat; }); scn.add(briggs);
         });
 
-        cam.position.set(0, 0, 10);
+        cam.position.set(0, 2, 12);
         const ctrl = new THREE.OrbitControls(cam, rnd.domElement);
+        
+        // --- CAMERA LOCKS ---
+        ctrl.maxDistance = 15;
+        ctrl.minDistance = 3;
+        ctrl.maxPolarAngle = Math.PI / 2.1; // Stops camera from going through floor
+        ctrl.target.set(0, 0, 0);
+        ctrl.update();
+
         function anim() { requestAnimationFrame(anim); rnd.render(scn, cam); }
         anim();
     }

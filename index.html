@@ -6,9 +6,6 @@
     <title>Seattle Snack Tracker</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
@@ -17,7 +14,7 @@
         
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .controls-left { display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.95); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.95); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; border-radius: 8px; }
         
         #save-btn { background: #ff3333; color: white; border: none; padding: 14px; width: 100%; margin-top: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px; transition: 0.3s; }
         .pulse { animation: pulseRed 1.2s infinite; }
@@ -26,16 +23,11 @@
         .syncing { background: #ffcc33 !important; color: black !important; animation: pulseYellow 0.8s infinite !important; }
         @keyframes pulseYellow { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        #boost-btn { background: #222; color: #00ff66; border: 2px solid #00ff66; font-size: 11px; padding: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 180px; border-radius: 4px; }
-        #boost-btn.active { background: #00ff66; color: black; box-shadow: 0 0 20px rgba(0, 255, 102, 0.6); }
-
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
-        .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
-        
-        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 220px; height: 220px; pointer-events: none; }
-        #crosshair { width: 100%; height: 100%; border: 3px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.75); }
-        
+        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; pointer-events: none; }
+        #crosshair { width: 100px; height: 100px; border: 3px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.6); }
+
+        .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         #celebration { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; justify-content: center; align-items: center; text-align: center; }
     </style>
 </head>
@@ -49,40 +41,44 @@
 
 <div id="celebration" onclick="this.style.display='none'">
     <div>
-        <h1 style="color:#ffcc33; font-size:48px;">YARD CLEAN!</h1>
-        <p style="color:white; font-size:20px;">SYNC COMPLETE</p>
-        <button class="btn" style="margin-top:20px" onclick="location.reload()">REFRESH APP</button>
+        <h1 style="color:#ffcc33; font-size:48px;">YARD CLEANED!</h1>
+        <p style="color:white; font-size:20px;">SYNCED TO CLOUD</p>
+        <p style="color:#666; margin-top:10px;">TAP TO CLOSE</p>
     </div>
 </div>
 
 <div class="ui-header">
     <div class="controls-left">
-        <button id="boost-btn" onclick="toggleShadowBoost()">SHADOW BOOST: OFF</button>
         <button class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
     </div>
     <div class="stats">
         YARD SNACKS: <span id="snack-count">0</span>
-        <button id="save-btn" class="pulse" onclick="syncCurrentState()">SAVE</button>
+        <button id="save-btn" onclick="syncCurrentState()">SAVE</button>
     </div>
 </div>
 
-<div id="kennel-view"></div>
-
 <div class="nav-tabs">
-    <button class="btn" style="background:#00d4ff" onclick="showTab('map')">YARD</button>
-    <button class="btn" style="background:#00d4ff" onclick="showTab('kennel')">KENNEL</button>
-    <button id="clean-btn" class="btn" style="background:#ff3333; color:white;" onclick="forceClean()">CLEAR & SYNC</button>
+    <button id="clean-btn" class="btn" style="background:#ff3333; color:white; width: 200px;" onclick="yardCleaned()">YARD CLEANED!</button>
 </div>
 
 <script>
-    let markers = [], placementMode = false, shadowBoost = false;
+    let markers = [], placementMode = false;
     let audioContext;
 
     const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy"; 
     const BIN_ID = "694fc0c8d0ea881f40433700"; 
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
-    const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5 });
+    
+    // RESTORED ORIENTATION: Bearing 90 puts East at the top
+    const map = new mapboxgl.Map({ 
+        container: 'map', 
+        style: 'mapbox://styles/mapbox/satellite-v9', 
+        center: [-122.316167, 47.490222], 
+        zoom: 19.5,
+        bearing: 90, 
+        pitch: 0
+    });
 
     function unlockAudio() { if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); }
     
@@ -98,63 +94,45 @@
         osc.start(); osc.stop(audioContext.currentTime + 0.4);
     }
 
-    // --- NEW: FORCE CLEAN LOGIC ---
-    async function forceClean() {
+    // --- UPDATED: YARD CLEANED LOGIC ---
+    async function yardCleaned() {
+        // Visual clear
         markers.forEach(m => m.remove());
         markers = [];
         document.getElementById('snack-count').innerText = "0";
         
-        const btn = document.getElementById('save-btn');
-        btn.innerText = "SYNCING...";
-        btn.classList.add('syncing');
-
-        // Set a timeout: if server doesn't respond in 4s, assume success locally
-        const timeout = setTimeout(() => {
-            showCelebration();
-        }, 4000);
-
-        try {
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY, 'X-Bin-Versioning': 'false' },
-                body: JSON.stringify([])
-            });
-            if (res.ok) {
-                clearTimeout(timeout);
-                showCelebration();
-            }
-        } catch (e) {
-            console.warn("Cloud slow, forcing local clear.");
-        }
+        // Immediate Cloud Update (Forcing versioning off)
+        await syncCurrentState(true);
     }
 
-    function showCelebration() {
-        const btn = document.getElementById('save-btn');
-        btn.innerText = "CLEAN ✓";
-        btn.style.background = "#28a745";
-        btn.classList.remove('syncing', 'pulse');
-        
-        playSuccessSound();
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-        document.getElementById('celebration').style.display = 'flex';
-    }
-
-    async function syncCurrentState() {
+    async function syncCurrentState(silent = false) {
         const btn = document.getElementById('save-btn');
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
+        
         btn.innerText = "SYNCING...";
         btn.classList.add('syncing');
 
         try {
             const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-Master-Key': API_KEY,
+                    'X-Bin-Versioning': 'false' // CRITICAL: Stop creating new versions
+                },
                 body: JSON.stringify(data)
             });
+
             if(res.ok) {
                 btn.innerText = "SAVED ✓";
                 btn.style.background = "#28a745";
                 btn.classList.remove('syncing', 'pulse');
+                
+                if (data.length === 0 && silent === true) {
+                    playSuccessSound();
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    document.getElementById('celebration').style.display = 'flex';
+                }
             }
         } catch (e) {
             btn.innerText = "RETRY";
@@ -163,7 +141,7 @@
     }
 
     function createMarker(lng, lat) {
-        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px';
+        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(m);
         document.getElementById('snack-count').innerText = markers.length;
@@ -181,9 +159,14 @@
         document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; 
     }
 
-    // Load initial data
-    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { headers: { 'X-Master-Key': API_KEY } })
-    .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat)); });
+    // LOAD DATA - Forced Latest
+    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?nocache=${Date.now()}`, { 
+        headers: { 'X-Master-Key': API_KEY } 
+    })
+    .then(r=>r.json()).then(d=>{ 
+        if(d.record && Array.isArray(d.record)) d.record.forEach(p => createMarker(p.lng, p.lat));
+        else if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat));
+    });
 
 </script>
 </body>

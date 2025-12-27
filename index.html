@@ -12,17 +12,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
-        
         #map-container { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
-        /* Map Filter Layer - only affects the satellite, not the markers */
-        .map-filter { 
-            position: absolute; top: 0; width: 100%; height: 100%; 
-            pointer-events: none; transition: backdrop-filter 0.4s ease;
-            z-index: 1; 
-        }
-
         #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 160px; height: 160px; pointer-events: none; }
         #crosshair { width: 100%; height: 100%; border: 2px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.85); }
         #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 200px; height: 1px; background: rgba(0,255,0,0.5); }
@@ -30,38 +22,17 @@
         .scope-dot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px red; }
         #scope-cancel { position: absolute; top: 0; left: 0; background: #ff3333; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; pointer-events: auto; border: 2px solid white; font-size: 14px; z-index: 51; }
 
-        /* Celebration Screen */
-        #celebration-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 2000; display: none;
-            justify-content: center; align-items: center;
-        }
-
-        .gold-chain-box {
-            position: relative; padding: 60px; background: #050505;
-            border: 4px solid #443300; overflow: hidden;
-        }
-
-        /* Moving Link Animation */
-        .chain-link-track {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            border: 10px dotted #ffcc33;
-            animation: moveChain 1s linear infinite;
-        }
-
-        @keyframes moveChain {
-            from { outline: 2px solid #ffcc33; outline-offset: -5px; stroke-dashoffset: 0; }
-            to { outline: 2px solid #aa8800; outline-offset: -2px; stroke-dashoffset: 20; }
-        }
-
-        #celebration-text { font-size: 32px; font-weight: bold; color: #ffcc33; text-align: center; text-shadow: 0 0 15px #ffcc33; line-height: 1.2; }
+        #celebration-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; }
+        .gold-chain-box { position: relative; padding: 60px; background: #050505; border: 4px solid #443300; overflow: hidden; }
+        .chain-link-track { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 10px dotted #ffcc33; animation: moveChain 0.8s linear infinite; }
+        @keyframes moveChain { from { stroke-dashoffset: 0; outline: 2px solid #ffcc33; outline-offset: -5px; } to { stroke-dashoffset: 20; outline: 2px solid #aa8800; outline-offset: -2px; } }
+        #celebration-text { font-size: 32px; font-weight: bold; color: #ffcc33; text-align: center; text-shadow: 0 0 15px #ffcc33; line-height: 1.2; position: relative; z-index: 5; }
 
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 180px; }
         #sync-time { font-size: 10px; cursor: pointer; text-decoration: underline; }
         
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
-        
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         .btn-blue { background: #00d4ff; }
@@ -72,7 +43,6 @@
 
 <div id="map-container">
     <div id="map"></div>
-    <div id="map-light-overlay" class="map-filter"></div>
 </div>
 
 <div id="crosshair-container">
@@ -92,7 +62,7 @@
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
         <button id="lights-btn" class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 SHADOW LIFT</button>
     </div>
-    <div id="stats-box" class="stats">
+    <div class="stats">
         YARD SNACKS: <span id="snack-count">0</span><br>
         <div id="sync-time" onclick="syncDataFromServer()">LAST SYNC: WAITING...</div>
     </div>
@@ -100,7 +70,7 @@
 
 <div id="kennel-view"></div>
 
-<div id="footer-nav" class="nav-tabs">
+<div class="nav-tabs">
     <button class="btn btn-blue" onclick="showTab('map')">YARD</button>
     <button class="btn btn-blue" onclick="showTab('kennel')">KENNEL</button>
     <button id="clean-btn" class="btn btn-red" onclick="clearAllSnacks()">YARD CLEANED!</button>
@@ -114,7 +84,7 @@
     const woofSound = new Audio('https://cdn.freesound.org/previews/235/235911_3383091-lq.mp3');
     const trumpetSound = new Audio('https://cdn.freesound.org/previews/353/353500_5121236-lq.mp3');
 
-    function enableAudio() { if(!audioEnabled) { woofSound.play().then(()=>woofSound.pause()); trumpetSound.play().then(()=>trumpetSound.pause()); audioEnabled = true; } }
+    function enableAudio() { if(!audioEnabled) { audioEnabled = true; woofSound.play().then(()=>woofSound.pause()); trumpetSound.play().then(()=>trumpetSound.pause()); } }
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
@@ -125,10 +95,8 @@
         if(audioEnabled) { woofSound.currentTime=0; trumpetSound.currentTime=0; woofSound.play(); trumpetSound.play(); }
         const overlay = document.getElementById('celebration-overlay');
         overlay.style.display = 'flex';
-        gsap.fromTo(".gold-chain-box", { scale: 0, rotation: -20 }, { scale: 1, rotation: 0, duration: 0.6, ease: "back.out(1.7)" });
-        setTimeout(() => {
-            gsap.to(overlay, { opacity: 0, duration: 0.5, onComplete: () => { overlay.style.display = 'none'; overlay.style.opacity = 1; } });
-        }, 3000);
+        gsap.fromTo(".gold-chain-box", { scale: 0 }, { scale: 1, duration: 0.6, ease: "back.out" });
+        setTimeout(() => { gsap.to(overlay, { opacity: 0, duration: 0.5, onComplete: () => { overlay.style.display = 'none'; overlay.style.opacity = 1; } }); }, 3000);
     }
 
     function togglePlacementMode(s) { 
@@ -139,66 +107,45 @@
     
     function toggleLightBoost() {
         boostActive = !boostActive;
-        const mapCanvas = map.getCanvas();
-        // Applies ONLY to the map imagery, not markers
-        mapCanvas.style.filter = boostActive ? 
-            'brightness(1.5) contrast(0.8) saturate(1.3)' : 'none';
+        map.getCanvas().style.filter = boostActive ? 'brightness(1.5) contrast(0.8) saturate(1.3)' : 'none';
         document.getElementById('lights-btn').innerText = boostActive ? '👓 RESET' : '🔦 SHADOW LIFT';
     }
 
     function fireSnack() { 
         const c = map.getCenter(); 
-        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        dropSnack(c.lng, c.lat, true, timestamp); 
+        dropSnack(c.lng, c.lat, true, new Date().toLocaleTimeString()); 
         togglePlacementMode(false);
     }
 
     function dropSnack(lng, lat, sync, time) {
-        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer'; el.style.zIndex = "10";
+        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-        m.snackTime = time; markers.push(m);
-        updateCounter();
+        m.snackTime = time; markers.push(m); updateCounter();
         el.addEventListener('click', () => { if (!placementMode) collectSnack(m); });
         if (sync) syncCurrentState();
     }
 
     function collectSnack(m) {
         const s = m.getLngLat(), p = { lng: s.lng, lat: s.lat, sc: 1 };
-        gsap.to(p, { 
-            lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 0.8, 
-            onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, 
-            onComplete: () => { 
-                m.remove(); markers = markers.filter(x => x !== m); 
-                updateCounter(); syncCurrentState();
-                if(markers.length === 0) celebrate();
-            } 
+        gsap.to(p, { lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 0.8, onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, 
+            onComplete: () => { m.remove(); markers = markers.filter(x => x !== m); updateCounter(); syncCurrentState(); if(markers.length === 0) celebrate(); } 
         });
     }
 
     function clearAllSnacks() { 
-        if(markers.length === 0) return; 
-        let mCopy = [...markers];
-        mCopy.forEach((m, i) => { 
-            const s = m.getLngLat(), p = { lng: s.lng, lat: s.lat, sc: 1 }; 
-            gsap.to(p, { 
-                lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 1, delay: i*0.05, 
-                onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, 
-                onComplete: () => { 
-                    m.remove(); 
-                    markers = markers.filter(x => x !== m);
-                    if(markers.length === 0) { updateCounter(); syncCurrentState(); celebrate(); }
-                } 
-            }); 
-        }); 
+        if(markers.length === 0) return;
+        let batch = [...markers];
+        batch.forEach((m, i) => {
+            gsap.to({}, { delay: i*0.05, onComplete: () => collectSnack(m) });
+        });
     }
 
     async function syncDataFromServer() {
-        const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
         try {
-            const res = await fetch(url);
+            const res = await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`);
             if (res.ok) {
                 const data = await res.json();
-                if (data.length !== markers.length) {
+                if (JSON.stringify(data.map(d=>d.lng)) !== JSON.stringify(markers.map(m=>m.getLngLat().lng))) {
                     markers.forEach(m => m.remove()); markers = [];
                     data.forEach(p => dropSnack(p.lng, p.lat, false, p.time));
                 }
@@ -208,61 +155,56 @@
     }
 
     async function syncCurrentState() {
-        const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat, time: m.snackTime }));
-        await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+        await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`, { method: 'POST', body: JSON.stringify(data) });
     }
 
-    // --- KENNEL (REVERTED TO "GOLDEN" VERSION) ---
     function initKennel() {
         scn = new THREE.Scene(); scn.background = new THREE.Color(0x020202);
         cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
         rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight); rnd.shadowMap.enabled = true;
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
+        // Golden Pedestal
+        const pedGeom = new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32);
+        const pedMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 0.9, roughness: 0.1 });
+        const pedestal = new THREE.Mesh(pedGeom, pedMat); pedestal.position.y = -1.5; pedestal.receiveShadow = true; scn.add(pedestal);
+
+        // Yard Floor
         const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
-        grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; grnd.receiveShadow = true; scn.add(grnd);
+        grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
+
+        // Golden Picket Fence
+        const fenceGroup = new THREE.Group();
+        const picketGeom = new THREE.BoxGeometry(0.1, 1, 0.05);
+        const railGeom = new THREE.BoxGeometry(12, 0.05, 0.05);
+        for(let side=0; side<4; side++){
+            const sideGroup = new THREE.Group();
+            for(let i=-6; i<=6; i+=0.4) {
+                const p = new THREE.Mesh(picketGeom, pedMat); p.position.x = i; sideGroup.add(p);
+            }
+            const r1 = new THREE.Mesh(railGeom, pedMat); r1.position.y = 0.2; sideGroup.add(r1);
+            const r2 = new THREE.Mesh(railGeom, pedMat); r2.position.y = -0.2; sideGroup.add(r2);
+            sideGroup.position.z = 6;
+            if(side===1){ sideGroup.rotation.y = Math.PI/2; sideGroup.position.set(6,0,0); }
+            if(side===2){ sideGroup.rotation.y = Math.PI; sideGroup.position.set(0,0,-6); }
+            if(side===3){ sideGroup.rotation.y = -Math.PI/2; sideGroup.position.set(-6,0,0); }
+            fenceGroup.add(sideGroup);
+        }
+        fenceGroup.position.y = -1.2; scn.add(fenceGroup);
 
         const spot = new THREE.SpotLight(0xffaa33, 5); spot.position.set(0, 7, 1); spot.castShadow = true; scn.add(spot);
-        const fill = new THREE.DirectionalLight(0xffaa33, 0.8); fill.position.set(0, -2, 5); scn.add(fill);
-        scn.add(new THREE.AmbientLight(0xffaa33, 0.15));
-
-        ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
-        ctrl.enableDamping = true; cam.position.set(0, 1.5, 8);
+        scn.add(new THREE.AmbientLight(0xffaa33, 0.2));
+        ctrl = new THREE.OrbitControls(cam, rnd.domElement); ctrl.enableDamping = true; cam.position.set(0, 1.5, 10);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
-            briggs = g.scene; 
-            briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-            briggs.position.y = -1.48; scn.add(briggs);
+            briggs = g.scene; briggs.position.y = -1.25; scn.add(briggs);
         });
     }
 
-    function animate() { 
-        requestAnimationFrame(animate); 
-        if(ctrl) ctrl.update();
-        if(briggs) {
-            const t = Date.now() * 0.0015;
-            briggs.scale.set(1 + Math.sin(t) * 0.015, 1 + Math.sin(t) * 0.01, 1 + Math.sin(t) * 0.015);
-        }
-        if(rnd) rnd.render(scn, cam); 
-    }
-
-    function showTab(t) { 
-        const isK = (t === 'kennel');
-        document.getElementById('kennel-view').style.display = isK ? 'block' : 'none';
-        document.getElementById('clean-btn').style.display = isK ? 'none' : 'block';
-        document.getElementById('lights-btn').style.display = isK ? 'none' : 'block';
-        if(isK) window.dispatchEvent(new Event('resize')); 
-    }
-
-    initKennel(); animate();
-    syncDataFromServer(); setInterval(syncDataFromServer, 5000);
-    window.addEventListener('resize', () => { 
-        if(cam && rnd) {
-            cam.aspect = window.innerWidth/window.innerHeight; cam.updateProjectionMatrix(); 
-            rnd.setSize(window.innerWidth, window.innerHeight); 
-        }
-    });
+    function animate() { requestAnimationFrame(animate); if(ctrl) ctrl.update(); if(briggs) briggs.scale.setScalar(1 + Math.sin(Date.now()*0.0015)*0.015); if(rnd) rnd.render(scn, cam); }
+    function showTab(t) { document.getElementById('kennel-view').style.display = (t==='kennel') ? 'block' : 'none'; if(t==='kennel') window.dispatchEvent(new Event('resize')); }
+    initKennel(); animate(); syncDataFromServer(); setInterval(syncDataFromServer, 5000);
 </script>
 </body>
 </html>

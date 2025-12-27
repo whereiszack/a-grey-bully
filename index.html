@@ -12,7 +12,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
-        #map-container { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
         #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 160px; height: 160px; pointer-events: none; }
@@ -20,67 +19,61 @@
         #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 200px; height: 1px; background: rgba(0,255,0,0.5); }
         #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 200px; background: rgba(0,255,0,0.5); }
         .scope-dot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px red; }
-        #scope-cancel { position: absolute; top: 0; left: 0; background: #ff3333; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; pointer-events: auto; border: 2px solid white; font-size: 14px; z-index: 51; }
-
+        
         #celebration-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; }
-        .gold-chain-box { position: relative; padding: 60px; background: #050505; border: 4px solid #443300; overflow: hidden; }
+        .gold-chain-box { position: relative; padding: 60px; background: #050505; border: 4px solid #ffcc33; overflow: hidden; }
         .chain-link-track { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 10px dotted #ffcc33; animation: moveChain 0.8s linear infinite; }
-        @keyframes moveChain { from { stroke-dashoffset: 0; outline: 2px solid #ffcc33; outline-offset: -5px; } to { stroke-dashoffset: 20; outline: 2px solid #aa8800; outline-offset: -2px; } }
-        #celebration-text { font-size: 32px; font-weight: bold; color: #ffcc33; text-align: center; text-shadow: 0 0 15px #ffcc33; line-height: 1.2; position: relative; z-index: 5; }
-
+        @keyframes moveChain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 20; } }
+        
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 180px; }
-        #sync-time { font-size: 10px; cursor: pointer; text-decoration: underline; }
+        
+        #save-btn { 
+            background: #ff3333; color: white; border: none; padding: 10px; width: 100%; margin-top: 10px; 
+            font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s;
+        }
+        .pulse { animation: pulseRed 1.5s infinite; }
+        @keyframes pulseRed { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
-        .btn-blue { background: #00d4ff; }
-        .btn-red { background: #ff3333; color: white; }
     </style>
 </head>
 <body onclick="enableAudio()">
 
-<div id="map-container">
-    <div id="map"></div>
-</div>
-
+<div id="map"></div>
 <div id="crosshair-container">
-    <div id="scope-cancel" onclick="togglePlacementMode(false)">X</div>
     <div id="crosshair" onclick="fireSnack()"><div class="scope-dot"></div></div>
 </div>
 
 <div id="celebration-overlay">
-    <div class="gold-chain-box">
-        <div class="chain-link-track"></div>
-        <div id="celebration-text">SNACK PATROL<br>COMPLETE!</div>
-    </div>
+    <div class="gold-chain-box"><div class="chain-link-track"></div><div style="font-size:32px; color:#ffcc33; position:relative;">SNACK PATROL<br>COMPLETE!</div></div>
 </div>
 
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
-        <button id="lights-btn" class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 SHADOW LIFT</button>
+        <button id="lights-btn" class="btn" style="background:#00d4ff; margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 SHADOW LIFT</button>
     </div>
     <div class="stats">
-        YARD SNACKS: <span id="snack-count">0</span><br>
-        <div id="sync-time" onclick="syncDataFromServer()">LAST SYNC: WAITING...</div>
+        YARD SNACKS: <span id="snack-count">0</span>
+        <button id="save-btn" class="pulse" onclick="syncCurrentState()">SAVE</button>
     </div>
 </div>
 
 <div id="kennel-view"></div>
 
 <div class="nav-tabs">
-    <button class="btn btn-blue" onclick="showTab('map')">YARD</button>
-    <button class="btn btn-blue" onclick="showTab('kennel')">KENNEL</button>
-    <button id="clean-btn" class="btn btn-red" onclick="clearAllSnacks()">YARD CLEANED!</button>
+    <button class="btn" style="background:#00d4ff" onclick="showTab('map')">YARD</button>
+    <button class="btn" style="background:#00d4ff" onclick="showTab('kennel')">KENNEL</button>
+    <button id="clean-btn" class="btn" style="background:#ff3333; color:white;" onclick="clearAllSnacks()">YARD CLEANED!</button>
 </div>
 
 <script>
-    let markers = [], placementMode = false, boostActive = false, audioEnabled = false;
+    let markers = [], placementMode = false, audioEnabled = false;
     let briggs, scn, cam, rnd, ctrl;
     const BIN_ID = "whereiszack_bully_poops_final", iglooPos = { lng: -122.316167, lat: 47.490222 };
-    
     const woofSound = new Audio('https://cdn.freesound.org/previews/235/235911_3383091-lq.mp3');
     const trumpetSound = new Audio('https://cdn.freesound.org/previews/353/353500_5121236-lq.mp3');
 
@@ -89,122 +82,116 @@
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
 
-    function updateCounter() { document.getElementById('snack-count').innerText = markers.length; }
+    function setSaveState(saved) {
+        const btn = document.getElementById('save-btn');
+        if(saved) {
+            btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
+        } else {
+            btn.innerText = "SAVE"; btn.style.background = "#ff3333"; btn.classList.add('pulse');
+        }
+    }
 
     function celebrate() {
         if(audioEnabled) { woofSound.currentTime=0; trumpetSound.currentTime=0; woofSound.play(); trumpetSound.play(); }
-        const overlay = document.getElementById('celebration-overlay');
-        overlay.style.display = 'flex';
-        gsap.fromTo(".gold-chain-box", { scale: 0 }, { scale: 1, duration: 0.6, ease: "back.out" });
-        setTimeout(() => { gsap.to(overlay, { opacity: 0, duration: 0.5, onComplete: () => { overlay.style.display = 'none'; overlay.style.opacity = 1; } }); }, 3000);
+        document.getElementById('celebration-overlay').style.display = 'flex';
+        syncCurrentState();
+        setTimeout(() => { document.getElementById('celebration-overlay').style.display = 'none'; }, 3000);
     }
 
-    function togglePlacementMode(s) { 
-        placementMode = (s !== undefined) ? s : !placementMode; 
+    function togglePlacementMode() {
+        placementMode = !placementMode;
         document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none';
-        document.getElementById('log-btn').innerText = placementMode ? 'CANCEL' : '➕ LOG SNACK';
     }
-    
+
     function toggleLightBoost() {
-        boostActive = !boostActive;
-        map.getCanvas().style.filter = boostActive ? 'brightness(1.5) contrast(0.8) saturate(1.3)' : 'none';
-        document.getElementById('lights-btn').innerText = boostActive ? '👓 RESET' : '🔦 SHADOW LIFT';
+        map.getCanvas().style.filter = map.getCanvas().style.filter === 'none' ? 'brightness(1.5) contrast(0.8)' : 'none';
     }
 
-    function fireSnack() { 
-        const c = map.getCenter(); 
-        dropSnack(c.lng, c.lat, true, new Date().toLocaleTimeString()); 
-        togglePlacementMode(false);
-    }
-
-    function dropSnack(lng, lat, sync, time) {
+    function fireSnack() {
+        const c = map.getCenter();
         const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
-        const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-        m.snackTime = time; markers.push(m); updateCounter();
-        el.addEventListener('click', () => { if (!placementMode) collectSnack(m); });
-        if (sync) syncCurrentState();
+        const m = new mapboxgl.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(map);
+        markers.push(m);
+        document.getElementById('snack-count').innerText = markers.length;
+        el.onclick = () => { if(!placementMode) collectSnack(m); };
+        setSaveState(false); togglePlacementMode();
     }
 
     function collectSnack(m) {
-        const s = m.getLngLat(), p = { lng: s.lng, lat: s.lat, sc: 1 };
-        gsap.to(p, { lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 0.8, onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, 
-            onComplete: () => { m.remove(); markers = markers.filter(x => x !== m); updateCounter(); syncCurrentState(); if(markers.length === 0) celebrate(); } 
-        });
+        gsap.to(m.getLngLat(), { lng: iglooPos.lng, lat: iglooPos.lat, duration: 0.8, onUpdate: () => m.setLngLat([m.getLngLat().lng, m.getLngLat().lat]), onComplete: () => {
+            m.remove(); markers = markers.filter(x => x !== m);
+            document.getElementById('snack-count').innerText = markers.length;
+            setSaveState(false); if(markers.length === 0) celebrate();
+        }});
     }
 
-    function clearAllSnacks() { 
-        if(markers.length === 0) return;
-        let batch = [...markers];
-        batch.forEach((m, i) => {
-            gsap.to({}, { delay: i*0.05, onComplete: () => collectSnack(m) });
-        });
-    }
-
-    async function syncDataFromServer() {
-        try {
-            const res = await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (JSON.stringify(data.map(d=>d.lng)) !== JSON.stringify(markers.map(m=>m.getLngLat().lng))) {
-                    markers.forEach(m => m.remove()); markers = [];
-                    data.forEach(p => dropSnack(p.lng, p.lat, false, p.time));
-                }
-                document.getElementById('sync-time').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
-            }
-        } catch(e) {}
-    }
+    function clearAllSnacks() { markers.forEach(m => collectSnack(m)); }
 
     async function syncCurrentState() {
-        const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat, time: m.snackTime }));
+        const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
         await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`, { method: 'POST', body: JSON.stringify(data) });
+        setSaveState(true);
+    }
+
+    async function initialLoad() {
+        const res = await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`);
+        if(res.ok) {
+            const data = await res.json();
+            data.forEach(d => {
+                const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px';
+                const m = new mapboxgl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(map);
+                markers.push(m); el.onclick = () => collectSnack(m);
+            });
+            document.getElementById('snack-count').innerText = markers.length;
+            setSaveState(true);
+        }
     }
 
     function initKennel() {
         scn = new THREE.Scene(); scn.background = new THREE.Color(0x020202);
         cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
-        rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight); rnd.shadowMap.enabled = true;
+        rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
-        // Golden Pedestal
-        const pedGeom = new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32);
-        const pedMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 0.9, roughness: 0.1 });
-        const pedestal = new THREE.Mesh(pedGeom, pedMat); pedestal.position.y = -1.5; pedestal.receiveShadow = true; scn.add(pedestal);
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 0.9, roughness: 0.1 });
+        
+        // Pedestal
+        const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat);
+        ped.position.y = -1.5; scn.add(ped);
 
-        // Yard Floor
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
-        grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
-
-        // Golden Picket Fence
-        const fenceGroup = new THREE.Group();
-        const picketGeom = new THREE.BoxGeometry(0.1, 1, 0.05);
-        const railGeom = new THREE.BoxGeometry(12, 0.05, 0.05);
-        for(let side=0; side<4; side++){
-            const sideGroup = new THREE.Group();
-            for(let i=-6; i<=6; i+=0.4) {
-                const p = new THREE.Mesh(picketGeom, pedMat); p.position.x = i; sideGroup.add(p);
+        // Picket Fence
+        const fence = new THREE.Group();
+        for(let i=0; i<4; i++) {
+            const side = new THREE.Group();
+            for(let j=-6; j<=6; j+=0.5) {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1, 0.05), goldMat);
+                p.position.x = j; side.add(p);
             }
-            const r1 = new THREE.Mesh(railGeom, pedMat); r1.position.y = 0.2; sideGroup.add(r1);
-            const r2 = new THREE.Mesh(railGeom, pedMat); r2.position.y = -0.2; sideGroup.add(r2);
-            sideGroup.position.z = 6;
-            if(side===1){ sideGroup.rotation.y = Math.PI/2; sideGroup.position.set(6,0,0); }
-            if(side===2){ sideGroup.rotation.y = Math.PI; sideGroup.position.set(0,0,-6); }
-            if(side===3){ sideGroup.rotation.y = -Math.PI/2; sideGroup.position.set(-6,0,0); }
-            fenceGroup.add(sideGroup);
+            side.position.z = 6; side.rotation.y = (Math.PI/2)*i;
+            if(i===1) side.position.set(6,0,0); if(i===2) side.position.set(0,0,-6); if(i===3) side.position.set(-6,0,0);
+            fence.add(side);
         }
-        fenceGroup.position.y = -1.2; scn.add(fenceGroup);
+        fence.position.y = -1.2; scn.add(fence);
 
-        const spot = new THREE.SpotLight(0xffaa33, 5); spot.position.set(0, 7, 1); spot.castShadow = true; scn.add(spot);
-        scn.add(new THREE.AmbientLight(0xffaa33, 0.2));
-        ctrl = new THREE.OrbitControls(cam, rnd.domElement); ctrl.enableDamping = true; cam.position.set(0, 1.5, 10);
+        const spot = new THREE.SpotLight(0xffaa33, 5); spot.position.set(0, 7, 1); scn.add(spot);
+        scn.add(new THREE.AmbientLight(0xffaa33, 0.4));
+        ctrl = new THREE.OrbitControls(cam, rnd.domElement); cam.position.set(0, 1.5, 10);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
-            briggs = g.scene; briggs.position.y = -1.25; scn.add(briggs);
+            briggs = g.scene; briggs.position.y = -1.25;
+            briggs.traverse(n => { if(n.isMesh) n.material = goldMat; }); // Forced Gold Texture Overlay
+            scn.add(briggs);
         });
     }
 
-    function animate() { requestAnimationFrame(animate); if(ctrl) ctrl.update(); if(briggs) briggs.scale.setScalar(1 + Math.sin(Date.now()*0.0015)*0.015); if(rnd) rnd.render(scn, cam); }
-    function showTab(t) { document.getElementById('kennel-view').style.display = (t==='kennel') ? 'block' : 'none'; if(t==='kennel') window.dispatchEvent(new Event('resize')); }
-    initKennel(); animate(); syncDataFromServer(); setInterval(syncDataFromServer, 5000);
+    function animate() { requestAnimationFrame(animate); if(ctrl) ctrl.update(); if(rnd) rnd.render(scn, cam); }
+    function showTab(t) { 
+        const isK = t==='kennel';
+        document.getElementById('kennel-view').style.display = isK ? 'block' : 'none';
+        document.getElementById('clean-btn').style.display = isK ? 'none' : 'block';
+    }
+
+    initKennel(); animate(); initialLoad();
 </script>
 </body>
 </html>

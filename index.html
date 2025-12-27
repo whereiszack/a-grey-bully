@@ -22,8 +22,8 @@
         .pulse { animation: pulseRed 1.2s infinite; }
         @keyframes pulseRed { 0% { background: #ff3333; } 50% { background: #880000; } 100% { background: #ff3333; } }
 
-        #boost-btn { background: #222; color: #ffcc33; border: 2px solid #ffcc33; font-size: 11px; padding: 8px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 160px; }
-        #boost-btn.active { background: #ffcc33; color: black; }
+        #boost-btn { background: #222; color: #00ff66; border: 2px solid #00ff66; font-size: 11px; padding: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 180px; transition: 0.3s ease; border-radius: 4px; }
+        #boost-btn.active { background: #00ff66; color: black; box-shadow: 0 0 20px rgba(0, 255, 102, 0.6); }
 
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
@@ -50,7 +50,7 @@
 <div id="celebration" onclick="this.style.display='none'">
     <div>
         <h1 style="color:#ffcc33; font-size:48px; margin-bottom:10px;">SNACK PATROL<br>COMPLETE!</h1>
-        <p style="color:white; font-size:20px; font-weight:bold;">YARD SYNCED</p>
+        <p style="color:white; font-size:20px; font-weight:bold;">YARD SYNCED AT 0</p>
         <p style="color:#aaa; margin-top:20px;">TAP TO CLOSE</p>
     </div>
 </div>
@@ -87,19 +87,22 @@
         style: 'mapbox://styles/mapbox/satellite-v9', 
         center: [-122.316167, 47.490222], 
         zoom: 19.5, 
-        bearing: 90,
-        antialias: true 
+        bearing: 90
     });
 
-    // Defensive Map Effects Function
     function applyMapEffects() {
-        if (!map.isStyleLoaded()) return;
-        const layer = map.getLayer('satellite');
-        if (!layer) return;
-
-        map.setPaintProperty('satellite', 'raster-saturation', shadowBoost ? 0.5 : 0);
-        map.setPaintProperty('satellite', 'raster-contrast', shadowBoost ? 0.3 : 0);
-        map.setPaintProperty('satellite', 'raster-brightness-max', shadowBoost ? 0.7 : 1);
+        if (!map.isStyleLoaded() || !map.getLayer('satellite')) return;
+        if (shadowBoost) {
+            map.setPaintProperty('satellite', 'raster-brightness-min', 0.22); 
+            map.setPaintProperty('satellite', 'raster-brightness-max', 0.88); 
+            map.setPaintProperty('satellite', 'raster-saturation', 0.35);      
+            map.setPaintProperty('satellite', 'raster-contrast', 0.1);         
+        } else {
+            map.setPaintProperty('satellite', 'raster-brightness-min', 0);
+            map.setPaintProperty('satellite', 'raster-brightness-max', 1);
+            map.setPaintProperty('satellite', 'raster-saturation', 0);
+            map.setPaintProperty('satellite', 'raster-contrast', 0);
+        }
     }
 
     function toggleShadowBoost() {
@@ -111,23 +114,35 @@
     }
 
     map.on('style.load', applyMapEffects);
-    map.on('idle', applyMapEffects); // Secondary check to ensure map isn't black
+    map.on('idle', applyMapEffects);
 
     function setUnsaved() {
         const btn = document.getElementById('save-btn');
         btn.innerText = "SAVE"; btn.style.background = "#ff3333"; btn.classList.add('pulse');
     }
 
+    // FIX 1: Explicitly clear markers from Mapbox memory during clean
+    function clearAllSnacks() { 
+        markers.slice().forEach(m => collectSnack(m)); 
+    }
+
+    // FIX 2: Added Bin-Versioning: false to force overwrite of ghost data
     async function syncCurrentState() {
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
         try {
-            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+            const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY, 'X-Bin-Versioning': 'false' },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-Master-Key': API_KEY, 
+                    'X-Bin-Versioning': 'false' 
+                },
                 body: JSON.stringify(data)
             });
-            const btn = document.getElementById('save-btn');
-            btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
+            if(res.ok) {
+                const btn = document.getElementById('save-btn');
+                btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
+            }
         } catch (e) { console.error(e); }
     }
 
@@ -155,8 +170,6 @@
             }
         }});
     }
-
-    function clearAllSnacks() { markers.slice().forEach(m => collectSnack(m)); }
 
     function initKennel() {
         scn = new THREE.Scene();
@@ -206,8 +219,17 @@
     }
     initKennel(); animate();
 
-    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { headers: { 'X-Master-Key': API_KEY } })
-    .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat)); });
+    // FIX 3: Force the loading of /latest to ensure we don't see version 1
+    function loadLatest() {
+        fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { 
+            headers: { 'X-Master-Key': API_KEY } 
+        })
+        .then(r=>r.json()).then(d=>{ 
+            if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat)); 
+            document.getElementById('snack-count').innerText = markers.length;
+        });
+    }
+    loadLatest();
 </script>
 </body>
 </html>

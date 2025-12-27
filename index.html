@@ -121,14 +121,19 @@
         btn.innerText = "SAVE"; btn.style.background = "#ff3333"; btn.classList.add('pulse');
     }
 
-    // FIX 1: Explicitly clear markers from Mapbox memory during clean
     function clearAllSnacks() { 
+        if (markers.length === 0) {
+            // Even if screen is empty, force a sync to make sure cloud is zeroed out
+            syncCurrentState();
+            return;
+        }
         markers.slice().forEach(m => collectSnack(m)); 
     }
 
-    // FIX 2: Added Bin-Versioning: false to force overwrite of ghost data
     async function syncCurrentState() {
+        // This will now capture an empty array [] if no markers exist
         const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
+        
         try {
             const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
@@ -137,36 +142,48 @@
                     'X-Master-Key': API_KEY, 
                     'X-Bin-Versioning': 'false' 
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(data) // Sends [] if yard is clean
             });
             if(res.ok) {
                 const btn = document.getElementById('save-btn');
                 btn.innerText = "SAVED ✓"; btn.style.background = "#28a745"; btn.classList.remove('pulse');
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Sync Error:", e); }
     }
 
     function createMarker(lng, lat) {
         const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(m);
-        document.getElementById('snack-count').innerText = markers.length;
+        updateUI();
         el.onclick = () => { if(!placementMode) collectSnack(m); };
     }
 
-    function fireSnack() { createMarker(map.getCenter().lng, map.getCenter().lat); setUnsaved(); togglePlacementMode(); }
-    function togglePlacementMode() { placementMode = !placementMode; document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; }
+    function updateUI() {
+        document.getElementById('snack-count').innerText = markers.length;
+    }
+
+    function fireSnack() { 
+        createMarker(map.getCenter().lng, map.getCenter().lat); 
+        setUnsaved(); 
+        togglePlacementMode(); 
+    }
+    
+    function togglePlacementMode() { 
+        placementMode = !placementMode; 
+        document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; 
+    }
     
     function collectSnack(m) {
         const igloo = { lng: -122.316167, lat: 47.490222 };
         const obj = { lng: m.getLngLat().lng, lat: m.getLngLat().lat };
         gsap.to(obj, { lng: igloo.lng, lat: igloo.lat, duration: 0.8, onUpdate: () => m.setLngLat([obj.lng, obj.lat]), onComplete: () => {
             m.remove(); markers = markers.filter(x => x !== m);
-            document.getElementById('snack-count').innerText = markers.length;
+            updateUI();
             setUnsaved(); 
             if(markers.length === 0) { 
                 document.getElementById('celebration').style.display = 'flex';
-                syncCurrentState(); 
+                syncCurrentState(); // This is the crucial clean-yard sync
             }
         }});
     }
@@ -219,17 +236,16 @@
     }
     initKennel(); animate();
 
-    // FIX 3: Force the loading of /latest to ensure we don't see version 1
-    function loadLatest() {
-        fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { 
-            headers: { 'X-Master-Key': API_KEY } 
-        })
-        .then(r=>r.json()).then(d=>{ 
-            if(Array.isArray(d)) d.forEach(p => createMarker(p.lng, p.lat)); 
-            document.getElementById('snack-count').innerText = markers.length;
-        });
-    }
-    loadLatest();
+    // Initial Load - Force Latest
+    fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false`, { 
+        headers: { 'X-Master-Key': API_KEY } 
+    })
+    .then(r=>r.json()).then(d=>{ 
+        if(Array.isArray(d)) {
+            d.forEach(p => createMarker(p.lng, p.lat));
+        }
+        updateUI();
+    });
 </script>
 </body>
 </html>

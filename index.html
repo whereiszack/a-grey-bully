@@ -20,23 +20,23 @@
         #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 200px; background: rgba(0,255,0,0.5); }
         .scope-dot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px red; }
         
-        #celebration-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; }
+        #celebration-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; justify-content: center; align-items: center; }
         .gold-chain-box { position: relative; padding: 60px; background: #050505; border: 4px solid #ffcc33; overflow: hidden; text-align: center; }
         .chain-link-track { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 10px dotted #ffcc33; animation: moveChain 0.8s linear infinite; }
         @keyframes moveChain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 20; } }
         
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 200px; min-height: 100px; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: center; color: #ffcc33; min-width: 220px; }
         
         #save-btn { 
-            background: #ff3333; color: white; border: none; padding: 12px; width: 100%; margin-top: 10px; 
-            font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; font-family: inherit;
+            background: #ff3333; color: white; border: none; padding: 14px; width: 100%; margin-top: 10px; 
+            font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; font-family: inherit; font-size: 16px;
         }
-        #save-ts { font-size: 10px; display: block; margin-top: 8px; opacity: 0.9; font-weight: bold; color: #ffcc33; }
+        #save-ts { font-size: 11px; display: block; margin-top: 10px; font-weight: bold; color: #ffcc33; min-height: 1.2em; }
         .pulse { animation: pulseRed 1.2s infinite; }
-        @keyframes pulseRed { 0% { background: #ff3333; box-shadow: 0 0 0px #ff3333; } 50% { background: #990000; box-shadow: 0 0 15px #ff3333; } 100% { background: #ff3333; box-shadow: 0 0 0px #ff3333; } }
+        @keyframes pulseRed { 0% { background: #ff3333; } 50% { background: #aa0000; } 100% { background: #ff3333; } }
         
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #080808; }
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #0a0a0a; }
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
     </style>
@@ -79,6 +79,7 @@
     let markers = [], placementMode = false, audioEnabled = false;
     let briggs, scn, cam, rnd, ctrl;
     const BIN_ID = "whereiszack_bully_poops_final", iglooPos = { lng: -122.316167, lat: 47.490222 };
+    
     const woofSound = new Audio('https://cdn.freesound.org/previews/235/235911_3383091-lq.mp3');
     const trumpetSound = new Audio('https://cdn.freesound.org/previews/353/353500_5121236-lq.mp3');
 
@@ -100,13 +101,6 @@
         }
     }
 
-    function celebrate() {
-        if(audioEnabled) { woofSound.currentTime=0; trumpetSound.currentTime=0; woofSound.play(); trumpetSound.play(); }
-        document.getElementById('celebration-overlay').style.display = 'flex';
-        syncCurrentState();
-        setTimeout(() => { document.getElementById('celebration-overlay').style.display = 'none'; }, 3000);
-    }
-
     function togglePlacementMode() {
         placementMode = !placementMode;
         document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none';
@@ -117,13 +111,6 @@
         canvas.style.filter = (canvas.style.filter === 'none' || canvas.style.filter === '') ? 'brightness(1.5) contrast(0.8)' : 'none';
     }
 
-    function fireSnack() {
-        const c = map.getCenter();
-        createMarker(c.lng, c.lat);
-        setSaveState(false); 
-        togglePlacementMode();
-    }
-
     function createMarker(lng, lat) {
         const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
@@ -132,14 +119,26 @@
         el.onclick = () => { if(!placementMode) collectSnack(m); };
     }
 
+    function fireSnack() {
+        const c = map.getCenter();
+        createMarker(c.lng, c.lat);
+        setSaveState(false); togglePlacementMode();
+    }
+
     function collectSnack(m) {
-        const start = m.getLngLat();
-        const obj = { lng: start.lng, lat: start.lat };
+        const obj = { lng: m.getLngLat().lng, lat: m.getLngLat().lat };
         gsap.to(obj, { lng: iglooPos.lng, lat: iglooPos.lat, duration: 0.8, onUpdate: () => m.setLngLat([obj.lng, obj.lat]), onComplete: () => {
             m.remove(); markers = markers.filter(x => x !== m);
             document.getElementById('snack-count').innerText = markers.length;
             setSaveState(false); if(markers.length === 0) celebrate();
         }});
+    }
+
+    function celebrate() {
+        if(audioEnabled) { woofSound.currentTime=0; trumpetSound.currentTime=0; woofSound.play(); trumpetSound.play(); }
+        document.getElementById('celebration-overlay').style.display = 'flex';
+        syncCurrentState();
+        setTimeout(() => { document.getElementById('celebration-overlay').style.display = 'none'; }, 3000);
     }
 
     function clearAllSnacks() { markers.slice().forEach(m => collectSnack(m)); }
@@ -161,60 +160,50 @@
             const res = await fetch(`https://kvbin.com/api/v1/bins/${BIN_ID}`);
             if(res.ok) {
                 const data = await res.json();
-                if(data && Array.isArray(data)) {
-                    data.forEach(d => createMarker(d.lng, d.lat));
-                    setSaveState(true);
-                }
+                if(data && Array.isArray(data)) { data.forEach(d => createMarker(d.lng, d.lat)); setSaveState(true); }
             }
         } catch(e) { setSaveState(false); }
     }
 
     function initKennel() {
         scn = new THREE.Scene(); scn.background = new THREE.Color(0x050505);
-        cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+        cam = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
         rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
-        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 1.0, roughness: 0.15 });
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 1.0, roughness: 0.1 });
         
         // Pedestal
         const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.8, 0.5, 32), goldMat);
         ped.position.y = -1.5; scn.add(ped);
 
-        // Grass Floor
-        const grassMat = new THREE.MeshStandardMaterial({color: 0x1a331a, roughness: 0.8});
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), grassMat); 
+        // Grass Floor - Improved "Forest Green"
+        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x2d4c2d, roughness: 0.9})); 
         grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.76; scn.add(grnd);
 
-        // Golden Picket Fence with 2 Rails
+        // Fence with Rails
         const fence = new THREE.Group();
         const picketGeo = new THREE.BoxGeometry(0.1, 1, 0.05);
         const railGeo = new THREE.BoxGeometry(12, 0.04, 0.04);
-        
         for(let i=0; i<4; i++) {
             const side = new THREE.Group();
-            for(let j=-6; j<=6; j+=0.5) {
-                const p = new THREE.Mesh(picketGeo, goldMat);
-                p.position.x = j; side.add(p);
-            }
-            // Add two horizontal rails per side
+            for(let j=-6; j<=6; j+=0.5) { const p = new THREE.Mesh(picketGeo, goldMat); p.position.x = j; side.add(p); }
             const r1 = new THREE.Mesh(railGeo, goldMat); r1.position.y = 0.2; side.add(r1);
             const r2 = new THREE.Mesh(railGeo, goldMat); r2.position.y = -0.2; side.add(r2);
-            
             side.position.z = 6; side.rotation.y = (Math.PI/2)*i;
             if(i===1) side.position.set(6,0,0); if(i===2) side.position.set(0,0,-6); if(i===3) side.position.set(-6,0,0);
             fence.add(side);
         }
         fence.position.y = -1.2; scn.add(fence);
 
-        // Lighting - Brighter
-        const topLight = new THREE.SpotLight(0xffffff, 4); topLight.position.set(0, 8, 2); scn.add(topLight);
-        const backLight = new THREE.DirectionalLight(0xffaa33, 1.5); backLight.position.set(0, 2, -5); scn.add(backLight);
-        scn.add(new THREE.AmbientLight(0xffffff, 0.6));
+        // Lighting - Significantly Brightened
+        scn.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(5, 10, 7); scn.add(sun);
+        const fill = new THREE.PointLight(0xffaa33, 1, 20); fill.position.set(-5, 5, 2); scn.add(fill);
 
         ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
-        ctrl.maxPolarAngle = Math.PI / 2.1; // Prevent camera going through floor
-        cam.position.set(0, 1.5, 10);
+        ctrl.maxPolarAngle = Math.PI / 2.05; // Lock camera above floor
+        cam.position.set(0, 2, 10);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
             briggs = g.scene; briggs.position.y = -1.25;
@@ -224,15 +213,14 @@
     }
 
     function animate() { requestAnimationFrame(animate); if(ctrl) ctrl.update(); if(rnd) rnd.render(scn, cam); }
-    
     function showTab(t) { 
-        const isK = t === 'kennel';
-        document.getElementById('kennel-view').style.display = isK ? 'block' : 'none';
-        document.getElementById('clean-btn').style.display = isK ? 'none' : 'block';
-        if(isK) { window.dispatchEvent(new Event('resize')); }
+        document.getElementById('kennel-view').style.display = (t === 'kennel') ? 'block' : 'none';
+        document.getElementById('clean-btn').style.display = (t === 'kennel') ? 'none' : 'block';
+        if(t==='kennel') window.dispatchEvent(new Event('resize'));
     }
 
     initKennel(); animate(); initialLoad();
+    window.addEventListener('resize', () => { if(cam && rnd) { cam.aspect = window.innerWidth/window.innerHeight; cam.updateProjectionMatrix(); rnd.setSize(window.innerWidth, window.innerHeight); }});
 </script>
 </body>
 </html>

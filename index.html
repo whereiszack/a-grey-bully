@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seattle Snack Tracker</title>
+    <title>Seattle Snack Tracker: Patrol Mode</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -18,18 +18,42 @@
             transition: filter 0.4s ease;
             filter: brightness(1.2) contrast(1.1) saturate(1.1); 
         }
-        
-        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 160px; height: 160px; pointer-events: none; }
-        #crosshair { width: 100%; height: 100%; border: 2px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.85); }
-        #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 200px; height: 1px; background: rgba(0,255,0,0.5); }
-        #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 200px; background: rgba(0,255,0,0.5); }
-        .scope-dot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px red; }
-        #scope-cancel { position: absolute; top: 0; left: 0; background: #ff3333; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; pointer-events: auto; border: 2px solid white; font-size: 14px; z-index: 51; }
+
+        /* Triumphant Popup */
+        #celebration-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #111; padding: 40px; text-align: center; z-index: 1000;
+            display: none; box-shadow: 0 0 50px rgba(0,0,0,0.9);
+        }
+
+        /* Rotating Gold Chain Border Effect */
+        .chain-border {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: 8px solid transparent;
+            border-image: radial-gradient(#ffcc33 100%, #886600 100%) 1;
+            pointer-events: none;
+        }
+
+        .chain-links {
+            position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px;
+            border: 6px dashed #ffcc33;
+            border-radius: 10px;
+            animation: rotateChain 4s linear infinite;
+        }
+
+        @keyframes rotateChain {
+            from { outline: 4px solid #ffcc33; outline-offset: 5px; }
+            50% { outline: 4px solid #aa8800; outline-offset: 10px; }
+            to { outline: 4px solid #ffcc33; outline-offset: 5px; }
+        }
+
+        #celebration-text { font-size: 28px; font-weight: bold; color: #ffcc33; text-shadow: 2px 2px #000; }
 
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 160px; }
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 180px; }
+        #sync-time { font-size: 10px; color: #ffcc33; cursor: pointer; text-decoration: underline; display: inline-block; margin-top: 5px; }
         
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #080808; }
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         .btn-blue { background: #00d4ff; }
@@ -39,19 +63,21 @@
 <body>
 
 <div id="map"></div>
-<div id="crosshair-container">
-    <div id="scope-cancel" onclick="togglePlacementMode(false)">X</div>
-    <div id="crosshair" onclick="fireSnack()"><div class="scope-dot"></div></div>
+
+<div id="celebration-popup">
+    <div class="chain-border"></div>
+    <div class="chain-links"></div>
+    <div id="celebration-text">SNACK PATROL<br>COMPLETE!</div>
 </div>
 
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
-        <button id="lights-btn" class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 SHADOW LIFT</button>
+        <button id="lights-btn" class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 ULTRA SHADOW LIFT</button>
     </div>
     <div class="stats">
         YARD SNACKS: <span id="snack-count">0</span><br>
-        <span id="sync-status" style="font-size:10px; color:#ffcc33;">LIVE SYNC</span>
+        <div id="sync-time" onclick="syncDataFromServer()">LAST SYNC: WAITING...</div>
     </div>
 </div>
 
@@ -66,41 +92,59 @@
 <script>
     let markers = [], placementMode = false, boostActive = false;
     let briggs;
-    const BIN_ID = "whereiszack_bully_poops", iglooPos = { lng: -122.316167, lat: 47.490222 };
+    const BIN_ID = "whereiszack_bully_poops_final", iglooPos = { lng: -122.316167, lat: 47.490222 };
     
-    // Deep Triumphant Woof
+    // Audio Assets
     const woofSound = new Audio('https://cdn.freesound.org/previews/235/235911_3383091-lq.mp3');
+    const trumpetSound = new Audio('https://cdn.freesound.org/previews/353/353500_5121236-lq.mp3');
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
 
-    function updateCounter() {
-        document.getElementById('snack-count').innerText = markers.length;
-    }
+    function updateCounter() { document.getElementById('snack-count').innerText = markers.length; }
 
     function celebrate() {
-        woofSound.play();
-        gsap.to("body", { backgroundColor: "#ffcc33", duration: 0.1, yoyo: true, repeat: 5 });
+        // Play sounds
+        woofSound.currentTime = 0;
+        trumpetSound.currentTime = 0;
+        woofSound.play().catch(e => console.log("Audio blocked by browser"));
+        trumpetSound.play().catch(e => console.log("Audio blocked by browser"));
+
+        // Show Popup
+        const pop = document.getElementById('celebration-popup');
+        pop.style.display = 'block';
+        
+        gsap.fromTo(pop, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.7)" });
+        
+        // Hide after 2 seconds
+        setTimeout(() => {
+            gsap.to(pop, { opacity: 0, scale: 0.5, duration: 0.5, onComplete: () => { pop.style.display = 'none'; } });
+        }, 2500);
     }
 
-    function togglePlacementMode(s) { placementMode = (s !== undefined) ? s : !placementMode; document.getElementById('crosshair-container').style.display = placementMode ? 'block' : 'none'; document.getElementById('log-btn').innerText = placementMode ? 'CANCEL' : '➕ LOG SNACK'; }
+    function togglePlacementMode(s) { placementMode = (s !== undefined) ? s : !placementMode; }
     
     function toggleLightBoost() {
         boostActive = !boostActive;
         const mapDiv = document.getElementById('map');
-        mapDiv.style.filter = boostActive ? 'brightness(1.5) contrast(0.9) saturate(1.1)' : 'brightness(1.2) contrast(1.1) saturate(1.1)';
-        document.getElementById('lights-btn').innerText = boostActive ? '👓 RESET' : '🔦 SHADOW LIFT';
+        mapDiv.style.filter = boostActive ? 'brightness(1.8) contrast(0.8) saturate(1.6)' : 'brightness(1.2) contrast(1.1) saturate(1.1)';
+        document.getElementById('lights-btn').innerText = boostActive ? '👓 RESET' : '🔦 ULTRA SHADOW LIFT';
     }
 
-    function fireSnack() { const c = map.getCenter(); dropSnack(c.lng, c.lat, true); togglePlacementMode(false); }
+    function fireSnack() { 
+        const c = map.getCenter(); 
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        dropSnack(c.lng, c.lat, true, timestamp); 
+    }
 
-    function dropSnack(lng, lat, sync) {
-        const el = document.createElement('div'); el.innerHTML = '🦴'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
+    function dropSnack(lng, lat, sync, time) {
+        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+        m.snackTime = time || 'Unknown'; 
         markers.push(m);
         updateCounter();
         el.addEventListener('click', () => { if (!placementMode) collectSnack(m); });
-        if (sync) syncState();
+        if (sync) syncCurrentState();
     }
 
     function collectSnack(m) {
@@ -109,10 +153,8 @@
             lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 0.8, 
             onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, 
             onComplete: () => { 
-                m.remove(); 
-                markers = markers.filter(x => x !== m); 
-                updateCounter(); 
-                syncState();
+                m.remove(); markers = markers.filter(x => x !== m); 
+                updateCounter(); syncCurrentState();
                 if(markers.length === 0) celebrate();
             } 
         });
@@ -128,76 +170,57 @@
                 onComplete: () => { 
                     m.remove(); 
                     if(i === markers.length-1) { 
-                        markers = []; 
-                        updateCounter(); 
-                        syncState(); 
-                        celebrate();
+                        markers = []; updateCounter(); 
+                        syncCurrentState(); celebrate();
                     } 
                 } 
             }); 
         }); 
     }
 
-    async function syncState(newData = null) {
+    async function syncDataFromServer() {
         const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
-        if (newData) await fetch(url, { method: 'POST', body: JSON.stringify(newData) });
-        else { const res = await fetch(url); if (res.ok) { const d = await res.json(); markers.forEach(m => m.remove()); markers = []; d.forEach(p => dropSnack(p.lng, p.lat, false)); } }
-    }
-
-    // --- KENNEL ---
-    const scn = new THREE.Scene(); scn.background = new THREE.Color(0x020202);
-    const cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight); rnd.shadowMap.enabled = true;
-    document.getElementById('kennel-view').appendChild(rnd.domElement);
-    
-    const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
-    grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; grnd.receiveShadow = true; scn.add(grnd);
-
-    const spot = new THREE.SpotLight(0xffaa33, 3);
-    spot.position.set(0, 7, 1); spot.angle = Math.PI / 5; spot.penumbra = 0.9; spot.castShadow = true;
-    scn.add(spot);
-
-    const fillLight = new THREE.DirectionalLight(0xffaa33, 0.5);
-    fillLight.position.set(0, -2, 5); 
-    scn.add(fillLight);
-    scn.add(new THREE.AmbientLight(0xffaa33, 0.1));
-
-    function createFence() {
-        const fGroup = new THREE.Group();
-        const pGeom = new THREE.BoxGeometry(0.1, 0.8, 0.05);
-        const mat = new THREE.MeshStandardMaterial({ color: 0xcccccc });
-        for (let s = 0; s < 4; s++) {
-            const sGroup = new THREE.Group();
-            for (let i = -6; i <= 6; i += 0.4) {
-                const p = new THREE.Mesh(pGeom, mat); p.position.set(i, -1.1, 0);
-                sGroup.add(p);
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.length !== markers.length) {
+                    markers.forEach(m => m.remove());
+                    markers = [];
+                    data.forEach(p => dropSnack(p.lng, p.lat, false, p.time));
+                    if(data.length === 0 && markers.length > 0) celebrate();
+                }
+                const now = new Date();
+                document.getElementById('sync-time').innerText = `LAST SYNC: ${now.toLocaleTimeString()}`;
             }
-            sGroup.rotation.y = (Math.PI / 2) * s;
-            sGroup.position.x = s === 1 ? 6 : s === 3 ? -6 : 0;
-            sGroup.position.z = s === 0 ? 6 : s === 2 ? -6 : 0;
-            fGroup.add(sGroup);
-        }
-        scn.add(fGroup);
+        } catch(e) {}
     }
-    createFence();
 
-    const ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
-    ctrl.maxPolarAngle = Math.PI/2 - 0.1;
-    ctrl.enableDamping = true;
+    async function syncCurrentState() {
+        const url = `https://kvbin.com/api/v1/bins/${BIN_ID}`;
+        const data = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat, time: m.snackTime }));
+        await fetch(url, { method: 'POST', body: JSON.stringify(data) });
+    }
+
+    // --- KENNEL LIGHTING ---
+    const scn = new THREE.Scene(); scn.background = new THREE.Color(0x050505);
+    const cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('kennel-view').appendChild(rnd.domElement);
+    const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
+    grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; scn.add(grnd);
+
+    const spot = new THREE.SpotLight(0xffaa33, 6); spot.position.set(0, 7, 2); scn.add(spot);
+    const fillLight = new THREE.DirectionalLight(0xffaa33, 1.0); fillLight.position.set(0, 0, 5); scn.add(fillLight);
+    scn.add(new THREE.AmbientLight(0xffaa33, 0.2));
 
     new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
-        briggs = g.scene; 
-        briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-        const b = new THREE.Box3().setFromObject(briggs); 
-        briggs.position.sub(b.getCenter(new THREE.Vector3())); 
-        briggs.position.y = -1.48; 
-        scn.add(briggs);
+        briggs = g.scene; briggs.position.y = -1.48; scn.add(briggs);
     });
     cam.position.set(0, 1.5, 8);
 
     function animate() { 
         requestAnimationFrame(animate); 
-        ctrl.update(); 
         if(briggs) {
             const t = Date.now() * 0.0015;
             briggs.scale.set(1 + Math.sin(t) * 0.015, 1 + Math.sin(t) * 0.01, 1 + Math.sin(t) * 0.015);
@@ -207,14 +230,12 @@
     animate();
 
     function showTab(t) { 
-        const isK = t === 'kennel';
-        document.getElementById('kennel-view').style.display = isK ? 'block' : 'none';
-        document.getElementById('clean-btn').style.display = isK ? 'none' : 'block';
-        document.getElementById('lights-btn').style.display = isK ? 'none' : 'block';
-        if(isK) window.dispatchEvent(new Event('resize')); 
+        document.getElementById('kennel-view').style.display = (t === 'kennel') ? 'block' : 'none';
+        if(t === 'kennel') window.dispatchEvent(new Event('resize')); 
     }
 
-    syncState(); setInterval(syncState, 20000);
+    syncDataFromServer(); 
+    setInterval(syncDataFromServer, 5000); 
     window.addEventListener('resize', () => { cam.aspect = window.innerWidth/window.innerHeight; cam.updateProjectionMatrix(); rnd.setSize(window.innerWidth, window.innerHeight); });
 </script>
 </body>

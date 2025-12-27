@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seattle Snack Tracker: Patrol Mode</title>
+    <title>Seattle Snack Tracker</title>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -13,13 +13,16 @@
     <style>
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
         
-        #map { 
-            position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; 
-            transition: filter 0.4s ease;
-            filter: brightness(1.1) contrast(1.1) saturate(1.1); 
+        #map-container { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        
+        /* Map Filter Layer - only affects the satellite, not the markers */
+        .map-filter { 
+            position: absolute; top: 0; width: 100%; height: 100%; 
+            pointer-events: none; transition: backdrop-filter 0.4s ease;
+            z-index: 1; 
         }
 
-        /* Sniper Overlay */
         #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; display: none; width: 160px; height: 160px; pointer-events: none; }
         #crosshair { width: 100%; height: 100%; border: 2px solid #00ff00; border-radius: 50%; pointer-events: auto; position: relative; box-shadow: 0 0 0 4000px rgba(0,0,0,0.85); }
         #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 200px; height: 1px; background: rgba(0,255,0,0.5); }
@@ -27,48 +30,61 @@
         .scope-dot { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: red; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 12px red; }
         #scope-cancel { position: absolute; top: 0; left: 0; background: #ff3333; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; pointer-events: auto; border: 2px solid white; font-size: 14px; z-index: 51; }
 
-        /* Triumphant Popup */
-        #celebration-popup {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #111; padding: 40px; text-align: center; z-index: 1000;
-            display: none; box-shadow: 0 0 50px rgba(0,0,0,0.9); border: 2px solid #ffcc33;
+        /* Celebration Screen */
+        #celebration-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000; display: none;
+            justify-content: center; align-items: center;
         }
 
-        .chain-links {
-            position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px;
-            border: 6px dashed #ffcc33; border-radius: 10px;
-            animation: rotateChain 2s linear infinite;
+        .gold-chain-box {
+            position: relative; padding: 60px; background: #050505;
+            border: 4px solid #443300; overflow: hidden;
         }
 
-        @keyframes rotateChain {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(5deg); } /* Subtle shifting links */
+        /* Moving Link Animation */
+        .chain-link-track {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: 10px dotted #ffcc33;
+            animation: moveChain 1s linear infinite;
         }
 
-        #celebration-text { font-size: 28px; font-weight: bold; color: #ffcc33; text-shadow: 2px 2px #000; position: relative; z-index: 1001; }
+        @keyframes moveChain {
+            from { outline: 2px solid #ffcc33; outline-offset: -5px; stroke-dashoffset: 0; }
+            to { outline: 2px solid #aa8800; outline-offset: -2px; stroke-dashoffset: 20; }
+        }
+
+        #celebration-text { font-size: 32px; font-weight: bold; color: #ffcc33; text-align: center; text-shadow: 0 0 15px #ffcc33; line-height: 1.2; }
 
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
         .stats { pointer-events: auto; background: rgba(0,0,0,0.9); padding: 15px; border: 2px solid #ffcc33; text-align: right; color: #ffcc33; min-width: 180px; }
-        #sync-time { font-size: 10px; color: #ffcc33; cursor: pointer; text-decoration: underline; display: inline-block; margin-top: 5px; }
+        #sync-time { font-size: 10px; cursor: pointer; text-decoration: underline; }
         
-        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #080808; }
+        #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: #050505; }
+        
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 30; }
         .btn { pointer-events: auto; background: #ffcc33; color: black; border: none; padding: 12px 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; border-radius: 4px; }
         .btn-blue { background: #00d4ff; }
         .btn-red { background: #ff3333; color: white; }
     </style>
 </head>
-<body>
+<body onclick="enableAudio()">
 
-<div id="map"></div>
+<div id="map-container">
+    <div id="map"></div>
+    <div id="map-light-overlay" class="map-filter"></div>
+</div>
+
 <div id="crosshair-container">
     <div id="scope-cancel" onclick="togglePlacementMode(false)">X</div>
     <div id="crosshair" onclick="fireSnack()"><div class="scope-dot"></div></div>
 </div>
 
-<div id="celebration-popup">
-    <div class="chain-links"></div>
-    <div id="celebration-text">SNACK PATROL<br>COMPLETE!</div>
+<div id="celebration-overlay">
+    <div class="gold-chain-box">
+        <div class="chain-link-track"></div>
+        <div id="celebration-text">SNACK PATROL<br>COMPLETE!</div>
+    </div>
 </div>
 
 <div class="ui-header">
@@ -76,7 +92,7 @@
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG SNACK</button>
         <button id="lights-btn" class="btn btn-blue" style="margin-top:5px; font-size:10px;" onclick="toggleLightBoost()">🔦 SHADOW LIFT</button>
     </div>
-    <div class="stats">
+    <div id="stats-box" class="stats">
         YARD SNACKS: <span id="snack-count">0</span><br>
         <div id="sync-time" onclick="syncDataFromServer()">LAST SYNC: WAITING...</div>
     </div>
@@ -84,19 +100,21 @@
 
 <div id="kennel-view"></div>
 
-<div class="nav-tabs">
+<div id="footer-nav" class="nav-tabs">
     <button class="btn btn-blue" onclick="showTab('map')">YARD</button>
     <button class="btn btn-blue" onclick="showTab('kennel')">KENNEL</button>
     <button id="clean-btn" class="btn btn-red" onclick="clearAllSnacks()">YARD CLEANED!</button>
 </div>
 
 <script>
-    let markers = [], placementMode = false, boostActive = false;
+    let markers = [], placementMode = false, boostActive = false, audioEnabled = false;
     let briggs, scn, cam, rnd, ctrl;
     const BIN_ID = "whereiszack_bully_poops_final", iglooPos = { lng: -122.316167, lat: 47.490222 };
     
     const woofSound = new Audio('https://cdn.freesound.org/previews/235/235911_3383091-lq.mp3');
     const trumpetSound = new Audio('https://cdn.freesound.org/previews/353/353500_5121236-lq.mp3');
+
+    function enableAudio() { if(!audioEnabled) { woofSound.play().then(()=>woofSound.pause()); trumpetSound.play().then(()=>trumpetSound.pause()); audioEnabled = true; } }
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/satellite-v9', center: [-122.316167, 47.490222], zoom: 19.5, bearing: 90 });
@@ -104,14 +122,13 @@
     function updateCounter() { document.getElementById('snack-count').innerText = markers.length; }
 
     function celebrate() {
-        woofSound.play().catch(() => {});
-        trumpetSound.play().catch(() => {});
-        const pop = document.getElementById('celebration-popup');
-        pop.style.display = 'block';
-        gsap.fromTo(pop, { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out" });
+        if(audioEnabled) { woofSound.currentTime=0; trumpetSound.currentTime=0; woofSound.play(); trumpetSound.play(); }
+        const overlay = document.getElementById('celebration-overlay');
+        overlay.style.display = 'flex';
+        gsap.fromTo(".gold-chain-box", { scale: 0, rotation: -20 }, { scale: 1, rotation: 0, duration: 0.6, ease: "back.out(1.7)" });
         setTimeout(() => {
-            gsap.to(pop, { opacity: 0, scale: 0.5, duration: 0.5, onComplete: () => pop.style.display = 'none' });
-        }, 2500);
+            gsap.to(overlay, { opacity: 0, duration: 0.5, onComplete: () => { overlay.style.display = 'none'; overlay.style.opacity = 1; } });
+        }, 3000);
     }
 
     function togglePlacementMode(s) { 
@@ -122,11 +139,10 @@
     
     function toggleLightBoost() {
         boostActive = !boostActive;
-        const mapDiv = document.getElementById('map');
-        // Targeted: lifts shadows (brightness) while lowering contrast to prevent highlight blowout
-        mapDiv.style.filter = boostActive ? 
-            'brightness(1.6) contrast(0.7) saturate(1.3)' : 
-            'brightness(1.1) contrast(1.1) saturate(1.1)';
+        const mapCanvas = map.getCanvas();
+        // Applies ONLY to the map imagery, not markers
+        mapCanvas.style.filter = boostActive ? 
+            'brightness(1.5) contrast(0.8) saturate(1.3)' : 'none';
         document.getElementById('lights-btn').innerText = boostActive ? '👓 RESET' : '🔦 SHADOW LIFT';
     }
 
@@ -138,10 +154,9 @@
     }
 
     function dropSnack(lng, lat, sync, time) {
-        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer';
+        const el = document.createElement('div'); el.innerHTML = '💩'; el.style.fontSize = '40px'; el.style.cursor = 'pointer'; el.style.zIndex = "10";
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-        m.snackTime = time || 'Unknown'; 
-        markers.push(m);
+        m.snackTime = time; markers.push(m);
         updateCounter();
         el.addEventListener('click', () => { if (!placementMode) collectSnack(m); });
         if (sync) syncCurrentState();
@@ -162,18 +177,16 @@
 
     function clearAllSnacks() { 
         if(markers.length === 0) return; 
-        const count = markers.length;
-        markers.forEach((m, i) => { 
+        let mCopy = [...markers];
+        mCopy.forEach((m, i) => { 
             const s = m.getLngLat(), p = { lng: s.lng, lat: s.lat, sc: 1 }; 
             gsap.to(p, { 
                 lng: iglooPos.lng, lat: iglooPos.lat, sc: 0, duration: 1, delay: i*0.05, 
                 onUpdate: () => { m.setLngLat([p.lng, p.lat]); m.getElement().style.transform = `scale(${p.sc})`; }, 
                 onComplete: () => { 
                     m.remove(); 
-                    if(i === count - 1) { 
-                        markers = []; updateCounter(); 
-                        syncCurrentState(); celebrate();
-                    } 
+                    markers = markers.filter(x => x !== m);
+                    if(markers.length === 0) { updateCounter(); syncCurrentState(); celebrate(); }
                 } 
             }); 
         }); 
@@ -186,8 +199,7 @@
             if (res.ok) {
                 const data = await res.json();
                 if (data.length !== markers.length) {
-                    markers.forEach(m => m.remove());
-                    markers = [];
+                    markers.forEach(m => m.remove()); markers = [];
                     data.forEach(p => dropSnack(p.lng, p.lat, false, p.time));
                 }
                 document.getElementById('sync-time').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
@@ -201,25 +213,27 @@
         await fetch(url, { method: 'POST', body: JSON.stringify(data) });
     }
 
-    // --- KENNEL (RESTORED & BRIGHTER) ---
+    // --- KENNEL (REVERTED TO "GOLDEN" VERSION) ---
     function initKennel() {
-        scn = new THREE.Scene(); scn.background = new THREE.Color(0x0a0a0a);
+        scn = new THREE.Scene(); scn.background = new THREE.Color(0x020202);
         cam = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
-        rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight);
+        rnd = new THREE.WebGLRenderer({ antialias: true }); rnd.setSize(window.innerWidth, window.innerHeight); rnd.shadowMap.enabled = true;
         document.getElementById('kennel-view').appendChild(rnd.domElement);
         
-        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshStandardMaterial({color: 0x111111})); 
-        grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; scn.add(grnd);
+        const grnd = new THREE.Mesh(new THREE.PlaneGeometry(12,12), new THREE.MeshStandardMaterial({color: 0x0a1a0a})); 
+        grnd.rotation.x = -Math.PI/2; grnd.position.y = -1.5; grnd.receiveShadow = true; scn.add(grnd);
 
-        const spot = new THREE.SpotLight(0xffaa33, 8); spot.position.set(2, 8, 4); scn.add(spot);
-        const fill = new THREE.DirectionalLight(0xffaa33, 1.5); fill.position.set(-2, 2, 5); scn.add(fill);
-        scn.add(new THREE.AmbientLight(0xffaa33, 0.4));
+        const spot = new THREE.SpotLight(0xffaa33, 5); spot.position.set(0, 7, 1); spot.castShadow = true; scn.add(spot);
+        const fill = new THREE.DirectionalLight(0xffaa33, 0.8); fill.position.set(0, -2, 5); scn.add(fill);
+        scn.add(new THREE.AmbientLight(0xffaa33, 0.15));
 
-        ctrl = new THREE.OrbitControls(cam, rnd.domElement);
-        ctrl.enableDamping = true; cam.position.set(0, 1, 6);
+        ctrl = new THREE.OrbitControls(cam, rnd.domElement); 
+        ctrl.enableDamping = true; cam.position.set(0, 1.5, 8);
 
         new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (g) => {
-            briggs = g.scene; briggs.position.y = -1.48; scn.add(briggs);
+            briggs = g.scene; 
+            briggs.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+            briggs.position.y = -1.48; scn.add(briggs);
         });
     }
 
@@ -233,13 +247,15 @@
         if(rnd) rnd.render(scn, cam); 
     }
 
-    initKennel(); animate();
-
     function showTab(t) { 
-        document.getElementById('kennel-view').style.display = (t === 'kennel') ? 'block' : 'none';
-        if(t === 'kennel') window.dispatchEvent(new Event('resize')); 
+        const isK = (t === 'kennel');
+        document.getElementById('kennel-view').style.display = isK ? 'block' : 'none';
+        document.getElementById('clean-btn').style.display = isK ? 'none' : 'block';
+        document.getElementById('lights-btn').style.display = isK ? 'none' : 'block';
+        if(isK) window.dispatchEvent(new Event('resize')); 
     }
 
+    initKennel(); animate();
     syncDataFromServer(); setInterval(syncDataFromServer, 5000);
     window.addEventListener('resize', () => { 
         if(cam && rnd) {

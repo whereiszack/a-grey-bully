@@ -18,40 +18,32 @@
         #hud { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
         .interactive { pointer-events: auto; }
         
-        /* Stats & Save */
         .top-bar { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; }
         .stat-card { background: rgba(0,0,0,0.9); border: 2px solid #ffcc33; padding: 10px; border-radius: 8px; text-align: center; color: #ffcc33; min-width: 100px; }
         #save-btn { background: #ff3333; color: white; border: none; width: 100%; margin-top: 8px; padding: 8px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         
-        /* Nav Tabs */
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
         .btn-tab { background: #4ecdc4; color: black; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         .btn-clean { background: #ff3333; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         
-        /* Mission Popup */
         #mission-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-        .popup-box { border: 4px solid #ffcc33; padding: 40px; background: #111; border-radius: 15px; box-shadow: 0 0 50px rgba(255, 204, 51, 0.3); }
+        .popup-box { border: 4px solid #ffcc33; padding: 40px; background: #111; border-radius: 15px; }
 
         /* Igloo Styling */
         .igloo-marker { 
             width: 32px; height: 32px; background: #eef; border-radius: 50% 50% 5% 5%; border: 2px solid #99c; 
-            position: relative; z-index: 10 !important; box-shadow: inset -4px -4px 8px #ccd; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative; z-index: 10 !important; box-shadow: inset -4px -4px 8px #ccd;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .igloo-marker::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 40%; height: 8px; background: #334; border-radius: 4px 4px 0 0; }
         
-        .wiggle { animation: wiggle-anim 0.7s ease-in-out; transform: scale(2.2) !important; z-index: 100 !important; }
-        @keyframes wiggle-anim {
-            0%, 100% { transform: scale(2.2) rotate(0deg); }
-            25% { transform: scale(2.2) rotate(-15deg); }
-            75% { transform: scale(2.2) rotate(15deg); }
+        /* Controlled Vertical Jump & Scale */
+        .wiggle { 
+            transform: translateY(-80px) scale(2.0) !important; 
+            z-index: 100 !important; 
         }
 
-        /* Poop Markers */
-        .poop-marker { 
-            font-size: 34px; z-index: 2 !important; cursor: pointer; 
-            filter: drop-shadow(0 0 5px rgba(255,255,255,0.2)); 
-            pointer-events: auto; /* Required for individual deletion */
-        }
+        .poop-marker { font-size: 34px; z-index: 2 !important; cursor: pointer; pointer-events: auto; }
         
         #crosshair-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; z-index: 15; }
         .ring { width: 140px; height: 140px; border: 3px solid #00ff00; border-radius: 50%; position: relative; box-shadow: 0 0 20px #00ff00; }
@@ -96,9 +88,10 @@
     const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy";
     const BIN_ID = "694fc0c8d0ea881f40433700";
     
-    // Core Locations - Shifted North but Centered Longitude
+    // Centers IGLOO on screen while property is shifted
     const IGLOO_LOC = { lng: -122.316167, lat: 47.490222 };
-    const VIEW_CENTER = { lng: -122.316167, lat: 47.490322 }; // Corrected North shift
+    // Shift: Lng is decreased (West) by ~0.0001 to move property RIGHT on screen
+    const VIEW_CENTER = { lng: -122.316317, lat: 47.490322 }; 
 
     let markers = [];
     let iglooEl;
@@ -137,32 +130,31 @@
 
     function createMarker(lng, lat) {
         const el = document.createElement('div');
-        el.className = 'poop-marker';
-        el.innerHTML = '💩';
-        
+        el.className = 'poop-marker'; el.innerHTML = '💩';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         
-        // --- ADDED: Delete on Tap ---
-        el.addEventListener('click', (e) => {
+        el.onclick = (e) => {
             e.stopPropagation();
             m.remove();
-            markers = markers.filter(item => item !== m);
+            markers = markers.filter(x => x !== m);
             updateCounter();
             markUnsaved();
-        });
+        };
 
         markers.push(m);
         updateCounter();
     }
 
     function markUnsaved() {
-        const btn = document.getElementById('save-btn');
-        btn.innerText = "SAVE *"; btn.style.background = "#ff3333";
+        const b = document.getElementById('save-btn');
+        b.innerText = "SAVE *"; b.style.background = "#ff3333";
     }
 
     async function syncData() {
         const btn = document.getElementById('save-btn');
         btn.innerText = "SYNCING...";
+        
+        // SAVE markers, don't clear them!
         const payload = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
         if (payload.length === 0) payload.push(IGLOO_LOC);
 
@@ -173,17 +165,11 @@
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
-                // Animation happens immediately
                 iglooEl.classList.add('wiggle');
                 setTimeout(() => iglooEl.classList.remove('wiggle'), 1000);
                 confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                
                 btn.innerText = "SAVED ✓"; btn.style.background = "#28a745";
-                
-                // --- ADDED: 1 Second Delay for Popup ---
-                setTimeout(() => {
-                    document.getElementById('mission-popup').style.display = 'flex';
-                }, 1200);
+                setTimeout(() => { document.getElementById('mission-popup').style.display = 'flex'; }, 1500);
             }
         } catch (e) { btn.innerText = "SAVE"; }
     }
@@ -191,7 +177,7 @@
     function clearYard() {
         markers.forEach(m => m.remove());
         markers = [];
-        createMarker(IGLOO_LOC.lng, IGLOO_LOC.lat); 
+        createMarker(IGLOO_LOC.lng, IGLOO_LOC.lat);
         syncData(); 
     }
 
@@ -201,6 +187,7 @@
         if(t === 'kennel' && !window.threeInited) initKennel();
     }
 
+    // (Kennel init code remains the same for brevity)
     function initKennel() {
         window.threeInited = true;
         const scn = new THREE.Scene();
@@ -247,9 +234,9 @@
         fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest?meta=false&t=${Date.now()}`, {
             headers: { 'X-Master-Key': API_KEY }
         }).then(r => r.json()).then(data => {
-            const points = Array.isArray(data) ? data : (data.record || []);
-            if (points.length === 0) createMarker(IGLOO_LOC.lng, IGLOO_LOC.lat);
-            else points.forEach(p => createMarker(p.lng, p.lat));
+            const pts = Array.isArray(data) ? data : (data.record || []);
+            if (pts.length === 0) createMarker(IGLOO_LOC.lng, IGLOO_LOC.lat);
+            else pts.forEach(p => createMarker(p.lng, p.lat));
         });
     }
 </script>

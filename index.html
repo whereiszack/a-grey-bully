@@ -8,44 +8,59 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
+        body { margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; background: #000; color: white; overflow: hidden; height: 100vh; width: 100vw; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
         
         .ui-header { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
-        .stats { pointer-events: auto; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 12px; border: 2px solid #00ff00; min-width: 180px; text-align: right; box-sizing: border-box; }
+        .stats { pointer-events: auto; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 4px; border: 1px solid #00ff00; min-width: 180px; text-align: right; }
         
-        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; display: none; }
-        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #00ff00; }
-        #crosshair::before { width: 40px; height: 2px; left: -20px; top: 0; }
-        #crosshair::after { width: 2px; height: 40px; left: 0; top: -20px; }
+        /* Rifle Scope Reticle */
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; display: none; width: 100px; height: 100px; border: 2px solid #00ff00; border-radius: 50%; }
+        #crosshair::before { content: ''; position: absolute; top: 50%; left: -20px; width: 140px; height: 1px; background: #00ff00; }
+        #crosshair::after { content: ''; position: absolute; left: 50%; top: -20px; width: 1px; height: 140px; background: #00ff00; }
+        .scope-dot { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: red; border-radius: 50%; transform: translate(-50%, -50%); }
 
         #kennel-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #222, #000); display: none; z-index: 20; }
-        .nav-tabs { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 30; }
         
-        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 15px 25px; font-weight: bold; border-radius: 30px; cursor: pointer; text-transform: uppercase; font-size: 14px; white-space: nowrap; }
+        /* Store UI */
+        #store-panel { position: absolute; right: 20px; top: 80px; width: 200px; background: rgba(0,0,0,0.9); border: 1px solid #00d4ff; padding: 15px; display: none; z-index: 40; border-radius: 8px; }
+        .store-item { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; font-size: 12px; }
+        .store-item:hover { background: #111; color: #00d4ff; }
+
+        .nav-tabs { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 30; }
+        .btn { pointer-events: auto; background: #00ff00; color: black; border: none; padding: 12px 20px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px; }
         .btn-blue { background: #00d4ff; }
         .btn-red { background: #ff4d4d; color: white; }
+        .store-toggle { position: absolute; top: 20px; right: 20px; z-index: 41; }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
-<div id="crosshair"></div>
+<div id="crosshair"><div class="scope-dot"></div></div>
 
 <div class="ui-header">
     <div style="pointer-events: auto;">
         <button id="log-btn" class="btn" onclick="togglePlacementMode()">➕ LOG POOP</button>
-        <div id="tip-text" style="margin-top:10px; font-size:12px; display:none; color:#00ff00; text-shadow: 1px 1px 2px black;">AIM WITH CROSSHAIR, TAP BUTTON AGAIN</div>
     </div>
     <div class="stats">
-        <b>SCRAPS:</b> <span id="scrap-count">0</span><br>
-        <b>STATUS:</b> <span id="reward-status">Level 1 Bully</span>
+        SCRAPS: <span id="scrap-count">0</span><br>
+        STATUS: <span id="reward-status">VETERAN CLEANER</span>
     </div>
 </div>
 
-<div id="kennel-view"></div>
+<div id="kennel-view">
+    <button class="btn btn-blue store-toggle" onclick="toggleStore()">🛒 ACCESSORIES</button>
+    <div id="store-panel">
+        <h3 style="margin-top:0; color:#00d4ff; font-size:14px;">DOGGY STORE</h3>
+        <div class="store-item" onclick="equip('chain')"><span>GOLD CHAIN</span> <span>100</span></div>
+        <div class="store-item" onclick="equip('glasses')"><span>SUNGLASSES</span> <span>250</span></div>
+        <div class="store-item" onclick="equip('hat')"><span>TACTICAL HAT</span> <span>500</span></div>
+    </div>
+</div>
 
 <div class="nav-tabs">
     <button class="btn btn-blue" onclick="showTab('map')">THE YARD</button>
@@ -59,7 +74,7 @@
     let placementMode = false;
     const iglooPos = { lng: -122.316167, lat: 47.490222 };
 
-    // 1. Initialize Restricted Map
+    // 1. Mapbox
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({
         container: 'map',
@@ -67,110 +82,89 @@
         center: [-122.316167, 47.490222],
         zoom: 19.5,
         pitch: 65,
-        maxBounds: [[-122.3180, 47.4890], [-122.3140, 47.4915]],
-        antialias: true
+        maxBounds: [[-122.3180, 47.4890], [-122.3140, 47.4915]]
     });
 
-    map.on('style.load', () => {
-        map.setFog({ 'range': [0.5, 3], 'color': '#000', 'high-color': '#222' });
-    });
-
-    // 2. Crosshair Logic
     function togglePlacementMode() {
         placementMode = !placementMode;
-        const crosshair = document.getElementById('crosshair');
-        const tip = document.getElementById('tip-text');
+        document.getElementById('crosshair').style.display = placementMode ? 'block' : 'none';
         const btn = document.getElementById('log-btn');
-
         if (placementMode) {
-            crosshair.style.display = 'block';
-            tip.style.display = 'block';
-            btn.innerText = '🎯 DROP HERE';
-            btn.style.background = '#00d4ff';
+            btn.innerText = '🎯 FIRE';
+            btn.style.background = 'red'; btn.style.color = 'white';
         } else {
             const center = map.getCenter();
             dropPoop(center.lng, center.lat);
-            crosshair.style.display = 'none';
-            tip.style.display = 'none';
             btn.innerText = '➕ LOG POOP';
-            btn.style.background = '#00ff00';
+            btn.style.background = '#00ff00'; btn.style.color = 'black';
         }
     }
 
     function dropPoop(lng, lat) {
         const el = document.createElement('div');
-        el.innerHTML = '💩';
-        el.style.fontSize = '40px';
-        el.style.filter = 'drop-shadow(0 0 10px black)';
-        
-        const marker = new mapboxgl.Marker({ element: el })
-            .setLngLat([lng, lat])
-            .addTo(map);
+        el.innerHTML = '💩'; el.style.fontSize = '40px';
+        const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(marker);
     }
 
-    // 3. Poop-nado Animation
     function clearAllPoops() {
-        if (markers.length === 0) return;
-        markers.forEach((m, index) => {
+        markers.forEach((m, i) => {
             const start = m.getLngLat();
             const proxy = { lng: start.lng, lat: start.lat, scale: 1 };
             gsap.to(proxy, {
-                lng: iglooPos.lng, lat: iglooPos.lat, scale: 0.1,
-                duration: 1.2, delay: index * 0.05, ease: "power2.in",
-                onUpdate: () => {
-                    m.setLngLat([proxy.lng, proxy.lat]);
-                    m.getElement().style.transform = `scale(${proxy.scale})`;
-                },
-                onComplete: () => {
-                    m.remove();
-                    scraps += 10;
-                    document.getElementById('scrap-count').innerText = scraps;
-                    if (scraps >= 100) document.getElementById('reward-status').innerText = "GOLD CHAIN EQUIPPED!";
-                }
+                lng: iglooPos.lng, lat: iglooPos.lat, scale: 0.1, duration: 1, delay: i * 0.05,
+                onUpdate: () => { m.setLngLat([proxy.lng, proxy.lat]); m.getElement().style.transform = `scale(${proxy.scale})`; },
+                onComplete: () => { m.remove(); scraps += 10; document.getElementById('scrap-count').innerText = scraps; }
             });
         });
         markers = [];
     }
 
-    // 4. FIXED KENNEL & BRIGGS SCALE
+    // 2. Three.js Kennel with Controls
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('kennel-view').appendChild(renderer.domElement);
-    
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const dLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dLight.position.set(5, 10, 5);
-    scene.add(dLight);
 
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.autoRotate = false; // Set to false to allow user manual control
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
     let briggs;
     new THREE.GLTFLoader().load('https://raw.githubusercontent.com/whereiszack/a-grey-bully/main/Briggs.glb', (gltf) => {
         briggs = gltf.scene;
-        
-        // Auto-center and Auto-scale Briggs
         const box = new THREE.Box3().setFromObject(briggs);
         const center = box.getCenter(new THREE.Vector3());
-        briggs.position.sub(center); // Move model so its center is at 0,0,0
-        
-        briggs.scale.set(1, 1, 1); // Reset scale to 1 to test
+        briggs.position.sub(center); 
         scene.add(briggs);
     });
 
-    // Camera moved further back (8 instead of 5)
-    camera.position.set(0, 0.5, 8); 
+    camera.position.set(0, 0, 8);
 
     function animate() {
         requestAnimationFrame(animate);
-        if (briggs) briggs.rotation.y += 0.005;
+        controls.update();
         renderer.render(scene, camera);
     }
     animate();
 
     function showTab(tab) {
-        document.getElementById('kennel-view').style.display = tab === 'kennel' ? 'block' : 'none';
-        window.dispatchEvent(new Event('resize')); // Fixes squashed view
+        const isKennel = tab === 'kennel';
+        document.getElementById('kennel-view').style.display = isKennel ? 'block' : 'none';
+        document.getElementById('store-panel').style.display = 'none';
+        if(isKennel) window.dispatchEvent(new Event('resize'));
+    }
+
+    function toggleStore() {
+        const panel = document.getElementById('store-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function equip(item) {
+        if (scraps < 100) { alert("Not enough scraps!"); return; }
+        alert("Equipped " + item + "! (Coming soon in 3D)");
     }
 
     window.addEventListener('resize', () => {

@@ -18,33 +18,40 @@
         #hud { position: absolute; inset: 0; pointer-events: none; z-index: 100; }
         .interactive { pointer-events: auto; }
         
+        /* Stats & Save */
         .top-bar { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; }
         .stat-card { background: rgba(0,0,0,0.9); border: 2px solid #ffcc33; padding: 10px; border-radius: 8px; text-align: center; color: #ffcc33; min-width: 100px; }
         #save-btn { background: #ff3333; color: white; border: none; width: 100%; margin-top: 8px; padding: 8px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         
+        /* Crosshair */
         #crosshair-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; z-index: 15; }
         .ring { width: 140px; height: 140px; border: 3px solid #00ff00; border-radius: 50%; position: relative; box-shadow: 0 0 20px #00ff00; }
-        .ring::before { content: ''; position: absolute; top: 50%; left: 10%; width: 80%; height: 2px; background: #00ff00; transform: translateY(-50%); }
-        .ring::after { content: ''; position: absolute; left: 50%; top: 10%; width: 2px; height: 80%; background: #00ff00; transform: translateX(-50%); }
+        .ring::before, .ring::after { content: ''; position: absolute; background: #00ff00; }
+        .ring::before { top: 50%; left: 10%; width: 80%; height: 2px; transform: translateY(-50%); }
+        .ring::after { left: 50%; top: 10%; width: 2px; height: 80%; transform: translateX(-50%); }
         #cancel-x { position: absolute; top: -50px; left: -50px; background: #ff3333; color: white; width: 44px; height: 44px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; cursor: pointer; }
 
+        /* Navigation */
         .nav-tabs { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
         .btn-tab { background: #4ecdc4; color: black; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         .btn-clean { background: #ff3333; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         
-        /* Smaller, more accurate Igloo Icon */
+        /* Mission Popup */
+        #mission-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .popup-box { border: 4px solid #ffcc33; padding: 40px; background: #111; border-radius: 15px; box-shadow: 0 0 50px rgba(255, 204, 51, 0.3); }
+
+        /* Igloo Styling & Animations */
         .igloo-marker { 
-            width: 32px; height: 32px; 
-            background: #eef; border-radius: 50% 50% 5% 5%; 
-            border: 2px solid #99c; 
-            position: relative; 
-            z-index: 10 !important;
-            box-shadow: inset -4px -4px 8px #ccd;
+            width: 32px; height: 32px; background: #eef; border-radius: 50% 50% 5% 5%; border: 2px solid #99c; 
+            position: relative; z-index: 10 !important; box-shadow: inset -4px -4px 8px #ccd; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .igloo-marker::after {
-            content: ''; position: absolute; bottom: 0; left: 50%;
-            transform: translateX(-50%); width: 10px; height: 8px;
-            background: #334; border-radius: 4px 4px 0 0;
+        .igloo-marker::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; height: 8px; background: #334; border-radius: 4px 4px 0 0; }
+        
+        .wiggle { animation: wiggle-anim 0.5s ease-in-out; transform: scale(2.5) !important; z-index: 100 !important; }
+        @keyframes wiggle-anim {
+            0%, 100% { transform: scale(2.5) rotate(0deg); }
+            25% { transform: scale(2.5) rotate(-10deg); }
+            75% { transform: scale(2.5) rotate(10deg); }
         }
         .poop-marker { font-size: 34px; z-index: 2 !important; }
     </style>
@@ -75,16 +82,22 @@
     </div>
 </div>
 
+<div id="mission-popup" class="interactive" onclick="this.style.display='none'">
+    <div class="popup-box">
+        <h1 style="color:#ffcc33; margin:0; font-size:32px;">MISSION SUCCESS</h1>
+        <p style="font-size:18px; margin:20px 0;">Snack Patrol Complete!</p>
+        <p style="color:#666; font-size:12px;">TAP TO DISMISS</p>
+    </div>
+</div>
+
 <script>
     const API_KEY = "$2a$10$wDnQ92WEN9Bn.45gW7/Yz.kl3VaGduq9aa88sDptssEZHta.NekPy";
     const BIN_ID = "694fc0c8d0ea881f40433700";
-    
-    // Core Locations
     const IGLOO_LOC = { lng: -122.316167, lat: 47.490222 };
-    // Shifted center: North by ~0.0001 (approx 1/4 property length)
     const VIEW_CENTER = { lng: -122.316167, lat: 47.490322 }; 
 
     let markers = [];
+    let iglooEl;
 
     mapboxgl.accessToken = 'pk.eyJ1Ijoid2hlcmVpc3phY2siLCJhIjoiY21qbnZwbG9iM2V4aTNmb3d6eTNraHVkbiJ9.PUnVuym3IhJC7bviDHAa4A';
     const map = new mapboxgl.Map({
@@ -96,9 +109,9 @@
     });
 
     map.on('load', () => {
-        const el = document.createElement('div');
-        el.className = 'igloo-marker';
-        new mapboxgl.Marker({ element: el }).setLngLat([IGLOO_LOC.lng, IGLOO_LOC.lat]).addTo(map);
+        iglooEl = document.createElement('div');
+        iglooEl.className = 'igloo-marker';
+        new mapboxgl.Marker({ element: iglooEl }).setLngLat([IGLOO_LOC.lng, IGLOO_LOC.lat]).addTo(map);
         loadFromCloud();
     });
 
@@ -121,8 +134,7 @@
 
     function createMarker(lng, lat) {
         const el = document.createElement('div');
-        el.className = 'poop-marker';
-        el.innerHTML = '💩';
+        el.className = 'poop-marker'; el.innerHTML = '💩';
         const m = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
         markers.push(m);
         updateCounter();
@@ -133,6 +145,7 @@
         btn.innerText = "SYNCING...";
         const payload = markers.map(m => ({ lng: m.getLngLat().lng, lat: m.getLngLat().lat }));
         if (payload.length === 0) payload.push(IGLOO_LOC);
+
         try {
             const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                 method: 'PUT',
@@ -140,7 +153,13 @@
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
+                // Success Sequence
+                iglooEl.classList.add('wiggle');
+                setTimeout(() => iglooEl.classList.remove('wiggle'), 1000);
+                
                 btn.innerText = "SAVED ✓"; btn.style.background = "#28a745";
+                document.getElementById('mission-popup').style.display = 'flex';
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
             }
         } catch (e) { btn.innerText = "SAVE"; }
     }
@@ -149,7 +168,6 @@
         markers.forEach(m => m.remove());
         markers = [];
         createMarker(IGLOO_LOC.lng, IGLOO_LOC.lat); 
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.8 } });
         syncData(); 
     }
 
